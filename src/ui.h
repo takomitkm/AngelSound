@@ -25,6 +25,7 @@ typedef enum {
     UI_ACTION_BROWSE,
     UI_ACTION_DELETE,
     UI_ACTION_CYCLE_INPUT,
+    UI_ACTION_CHOOSE_FOLDER,
     UI_ACTION_ABOUT,
     UI_ACTION_QUIT
 } UiAction;
@@ -36,6 +37,7 @@ typedef struct {
     int scroll;
 
     const char *input_label; /* "Input: ..." composed by main */
+    const char *folder_label; /* "Folder: ..." composed by main */
     AudioState audio_state;
     uint64_t recording_ms;
     uint64_t session_ms;

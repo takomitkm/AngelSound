@@ -151,7 +151,9 @@ static int layout_buttons(const UiModel *m, UiButton *buttons, int cap)
                has_sel && st != AUDIO_STATE_RECORDING, 0);
     add_button(buttons, &n, RIGHT_X, 196, RIGHT_W, 32, m->input_label,
                UI_ACTION_CYCLE_INPUT, true, 0);
-    add_button(buttons, &n, RIGHT_X, 240, 128, 32, "About", UI_ACTION_ABOUT, true, 0);
+    add_button(buttons, &n, RIGHT_X, 240, 128, 32, "Folder",
+               UI_ACTION_CHOOSE_FOLDER, true, 0);
+    add_button(buttons, &n, RIGHT_X + 144, 240, 128, 32, "About", UI_ACTION_ABOUT, true, 0);
     (void)cap;
     return n;
 }
@@ -361,8 +363,11 @@ void ui_render(Ui *ui, UiModel *m)
 
     draw_text(r, 16, 14, "AngelSound", 96, 165, 250);
     draw_text(r, 16 + 11 * 8 + 8, 14, "- pseudo-voice practice recorder", 150, 156, 170);
+    if (m->folder_label != NULL) {
+        draw_text_clipped(r, 16, 30, m->folder_label, UI_LOGICAL_W - 32, 150, 156, 170);
+    }
     if (m->input_label != NULL) {
-        draw_text(r, 16, 30, m->input_label, 150, 156, 170);
+        draw_text(r, 16, 42, m->input_label, 150, 156, 170);
     }
     if (m->audio_state == AUDIO_STATE_RECORDING) {
         char rec[32], rec_line[48];

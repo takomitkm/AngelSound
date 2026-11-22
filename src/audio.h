@@ -3,16 +3,17 @@
 
 /* Cross-platform audio engine on SDL3: device enumeration, streaming
  * recording to a WAV file, and WAV playback with pause/resume.  SDL_INIT_AUDIO
- * must have been called (or will be called here) before audio_init(). */
+ * must have been called (or will be called here) before audio_init().
+ *
+ * Recording uses the capture device's native format (sample rate, channels,
+ * bit depth, integer/float) with no conversion stream, so the WAV is exactly
+ * what the device produced. */
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #include "wav.h"
-
-#define AUDIO_SAMPLE_RATE 44100
-#define AUDIO_CHANNELS 1
 
 typedef enum {
     AUDIO_STATE_IDLE,
@@ -34,6 +35,8 @@ void audio_input_name(const AudioEngine *a, int index, char *buf, size_t cap);
 
 AudioState audio_state(const AudioEngine *a);
 uint64_t audio_record_frames(const AudioEngine *a);
+/* Sample rate of the most recent capture (0 before the first recording). */
+int audio_record_rate(const AudioEngine *a);
 
 bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t errcap);
 bool audio_stop_recording(AudioEngine *a, uint64_t *frames, char *err, size_t errcap);

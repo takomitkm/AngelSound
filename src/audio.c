@@ -1,10 +1,9 @@
 #include "audio.h"
 
 #include <SDL3/SDL.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define REC_BYTES_PER_FRAME (AUDIO_CHANNELS * 2) /* S16 mono */
 
 struct AudioEngine {
     SDL_AudioDeviceID *inputs;
@@ -16,6 +15,9 @@ struct AudioEngine {
     WavWriter rec_wav;
     bool rec_wav_open;
     uint64_t rec_frames;
+    int rec_bytes_per_frame;
+    int rec_rate;
+    int last_rec_rate;
 
     SDL_AudioDeviceID play_dev;
     SDL_AudioStream *play_stream;
@@ -23,13 +25,31 @@ struct AudioEngine {
     AudioState state;
 };
 
-static SDL_AudioSpec capture_spec(void)
+/* WAV can store 8-bit unsigned PCM, 16/32-bit little-endian PCM, or 32-bit
+ * float.  Anything else would need a conversion, which we deliberately avoid. */
+static bool capture_format_ok(const SDL_AudioSpec *spec, char *err, size_t errcap)
 {
-    SDL_AudioSpec spec;
-    spec.format = SDL_AUDIO_S16;
-    spec.channels = AUDIO_CHANNELS;
-    spec.freq = AUDIO_SAMPLE_RATE;
-    return spec;
+    SDL_AudioFormat fmt = spec->format;
+    int bits = fmt & SDL_AUDIO_MASK_BITSIZE;
+    bool is_float = (fmt & SDL_AUDIO_MASK_FLOAT) != 0;
+    bool is_big = (fmt & SDL_AUDIO_MASK_BIG_ENDIAN) != 0;
+    bool is_signed = (fmt & SDL_AUDIO_MASK_SIGNED) != 0;
+
+    bool ok = spec->channels >= 1 && spec->channels <= 8 && spec->freq > 0 &&
+              !is_big;
+    if (ok && is_float) {
+        ok = bits == 32;
+    } else if (ok && bits == 8) {
+        ok = !is_signed;
+    } else if (ok) {
+        ok = bits == 16 || bits == 32;
+    }
+    if (!ok) {
+        snprintf(err, errcap,
+                 "unsupported capture format (format=0x%x, %d ch, %d Hz)",
+                 (unsigned)spec->format, spec->channels, spec->freq);
+    }
+    return ok;
 }
 
 static void close_recording(AudioEngine *a)
@@ -78,7 +98,7 @@ static void pump_recording(AudioEngine *a)
         if (!wav_writer_write(&a->rec_wav, buf, (size_t)got)) {
             break; /* keep recording; the file may be incomplete */
         }
-        a->rec_frames += (uint64_t)got / REC_BYTES_PER_FRAME;
+        a->rec_frames += (uint64_t)got / (uint64_t)a->rec_bytes_per_frame;
         avail -= got;
     }
 }
@@ -159,6 +179,11 @@ uint64_t audio_record_frames(const AudioEngine *a)
     return a->rec_frames;
 }
 
+int audio_record_rate(const AudioEngine *a)
+{
+    return a->last_rec_rate;
+}
+
 bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t errcap)
 {
     if (a->state == AUDIO_STATE_RECORDING) {
@@ -171,12 +196,25 @@ bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t e
         want = a->inputs[a->input_index - 1];
     }
 
-    SDL_AudioSpec spec = capture_spec();
-    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(want, &spec);
+    /* NULL spec = use the device's own format; no conversion on capture. */
+    SDL_AudioDeviceID dev = SDL_OpenAudioDevice(want, NULL);
     if (dev == 0) {
         snprintf(err, errcap, "open recording device: %s", SDL_GetError());
         return false;
     }
+
+    SDL_AudioSpec spec;
+    if (!SDL_GetAudioDeviceFormat(dev, &spec, NULL)) {
+        snprintf(err, errcap, "read capture format: %s", SDL_GetError());
+        SDL_CloseAudioDevice(dev);
+        return false;
+    }
+    if (!capture_format_ok(&spec, err, errcap)) {
+        SDL_CloseAudioDevice(dev);
+        return false;
+    }
+    int bits = spec.format & SDL_AUDIO_MASK_BITSIZE;
+    bool is_float = (spec.format & SDL_AUDIO_MASK_FLOAT) != 0;
 
     SDL_AudioStream *stream = SDL_CreateAudioStream(&spec, &spec);
     if (stream == NULL) {
@@ -192,8 +230,8 @@ bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t e
     }
 
     WavWriter wav;
-    if (!wav_writer_open(&wav, path, AUDIO_CHANNELS, AUDIO_SAMPLE_RATE, 16, false,
-                         err, errcap)) {
+    if (!wav_writer_open(&wav, path, (uint16_t)spec.channels, (uint32_t)spec.freq,
+                         (uint16_t)bits, is_float, err, errcap)) {
         SDL_UnbindAudioStream(stream);
         SDL_DestroyAudioStream(stream);
         SDL_CloseAudioDevice(dev);
@@ -205,6 +243,9 @@ bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t e
     a->rec_wav = wav;
     a->rec_wav_open = true;
     a->rec_frames = 0;
+    a->rec_bytes_per_frame = spec.channels * (bits / 8);
+    a->rec_rate = spec.freq;
+    a->last_rec_rate = spec.freq;
     a->state = AUDIO_STATE_RECORDING;
 
     if (!SDL_ResumeAudioDevice(dev)) {

@@ -10,11 +10,114 @@
 #include "ui.h"
 
 #define REC_NAME_CAP 64
+#define PATH_CAP 1024
 
 typedef struct {
     char **files;
     int count;
 } FileList;
+
+/* Recordings folder, persisted in SDL's per-user pref dir. */
+static char g_recordings_dir[PATH_CAP];
+static char g_folder_label[PATH_CAP + 16];
+static char g_picked_dir[PATH_CAP];
+static bool g_folder_picked;
+static bool g_folder_pick_failed;
+
+static void settings_path(char *out, size_t cap)
+{
+    char *pref = SDL_GetPrefPath("Aimo", "AngelSound");
+    if (pref == NULL) {
+        out[0] = '\0';
+        return;
+    }
+    snprintf(out, cap, "%s/settings.txt", pref);
+    SDL_free(pref);
+}
+
+static void default_recordings_dir(char *out, size_t cap)
+{
+    const char *env = getenv("ANGELSOUND_DIR");
+    if (env != NULL && *env != '\0') {
+        snprintf(out, cap, "%s", env);
+        return;
+    }
+    const char *music = SDL_GetUserFolder(SDL_FOLDER_MUSIC);
+    if (music != NULL && *music != '\0') {
+        snprintf(out, cap, "%s/AngelSound", music);
+    } else {
+        snprintf(out, cap, "AngelSound");
+    }
+}
+
+static void load_settings(void)
+{
+    g_recordings_dir[0] = '\0';
+
+    const char *env = getenv("ANGELSOUND_DIR");
+    if (env != NULL && *env != '\0' && SDL_CreateDirectory(env)) {
+        snprintf(g_recordings_dir, sizeof(g_recordings_dir), "%s", env);
+        return;
+    }
+
+    char sp[PATH_CAP];
+    settings_path(sp, sizeof(sp));
+    if (sp[0] != '\0') {
+        size_t size = 0;
+        char *data = SDL_LoadFile(sp, &size);
+        if (data != NULL) {
+            static const char key[] = "recordings_dir=";
+            size_t key_len = sizeof(key) - 1;
+            if (size >= key_len && memcmp(data, key, key_len) == 0) {
+                size_t len = size - key_len;
+                while (len > 0 &&
+                       (data[key_len + len - 1] == '\n' || data[key_len + len - 1] == '\r')) {
+                    len--;
+                }
+                if (len > 0 && len < sizeof(g_recordings_dir)) {
+                    memcpy(g_recordings_dir, data + key_len, len);
+                    g_recordings_dir[len] = '\0';
+                }
+            }
+            SDL_free(data);
+        }
+    }
+
+    if (g_recordings_dir[0] == '\0') {
+        default_recordings_dir(g_recordings_dir, sizeof(g_recordings_dir));
+    }
+    if (!SDL_CreateDirectory(g_recordings_dir)) {
+        default_recordings_dir(g_recordings_dir, sizeof(g_recordings_dir));
+        if (!SDL_CreateDirectory(g_recordings_dir)) {
+            snprintf(g_recordings_dir, sizeof(g_recordings_dir), ".");
+        }
+    }
+}
+
+static void save_settings(void)
+{
+    char sp[PATH_CAP];
+    settings_path(sp, sizeof(sp));
+    if (sp[0] == '\0') {
+        return;
+    }
+    char buf[PATH_CAP + 32];
+    int len = snprintf(buf, sizeof(buf), "recordings_dir=%s\n", g_recordings_dir);
+    if (len > 0) {
+        SDL_SaveFile(sp, buf, (size_t)len);
+    }
+}
+
+static void dir_path(char *out, size_t cap, const char *name)
+{
+    snprintf(out, cap, "%s/%s", g_recordings_dir, name);
+}
+
+static bool path_exists(const char *path)
+{
+    SDL_PathInfo info;
+    return SDL_GetPathInfo(path, &info);
+}
 
 static int cmp_str(const void *a, const void *b)
 {
@@ -61,7 +164,7 @@ static void refresh_files(FileList *list)
 {
     filelist_free(list);
     int n = 0;
-    char **items = SDL_GlobDirectory(".", "ASREC_*.wav", 0, &n);
+    char **items = SDL_GlobDirectory(g_recordings_dir, "ASREC_*.wav", 0, &n);
     if (items != NULL) {
         for (int i = 0; i < n; i++) {
             filelist_add(list, items[i]);
@@ -87,11 +190,11 @@ static void recording_name(char *buf, size_t cap)
     }
     snprintf(buf, cap, "ASREC_%s.wav", stamp);
     for (int n = 1; n < 100; n++) {
-        FILE *f = fopen(buf, "rb");
-        if (f == NULL) {
+        char full[PATH_CAP];
+        dir_path(full, sizeof(full), buf);
+        if (!path_exists(full)) {
             return; /* free name */
         }
-        fclose(f);
         snprintf(buf, cap, "ASREC_%s-%d.wav", stamp, n);
     }
 }
@@ -116,8 +219,10 @@ static void show_about(SDL_Window *window)
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "About AngelSound",
                              "AngelSound - pseudo-voice practice recorder\n"
                              "C + SDL3 rewrite of MoeDisk/AngelSound (Delphi).\n\n"
-                             "Recordings are saved as ASREC_*.wav in the app's "
-                             "working directory (16-bit mono 44.1 kHz).\n\n"
+                             "Recordings are saved as ASREC_*.wav in the recordings folder "
+                             "(default: Music/AngelSound; use Folder to change).\n"
+                             "Capture uses the microphone's native format with no "
+                             "resampling or format conversion.\n\n"
                              "Keys: R record · S stop · Space play/pause · "
                              "Del delete · B browse",
                              window);
@@ -165,6 +270,18 @@ static int find_file(const FileList *list, const char *name)
         }
     }
     return -1;
+}
+
+static void SDLCALL folder_dialog_cb(void *userdata, const char *const *filelist, int filter)
+{
+    (void)userdata;
+    (void)filter;
+    if (filelist == NULL || filelist[0] == NULL) {
+        g_folder_pick_failed = true;
+        return;
+    }
+    snprintf(g_picked_dir, sizeof(g_picked_dir), "%s", filelist[0]);
+    g_folder_picked = true;
 }
 
 int main(int argc, char **argv)
@@ -228,6 +345,7 @@ int main(int argc, char **argv)
     }
 
     FileList list = { 0 };
+    load_settings();
     refresh_files(&list);
 
     Practice practice;
@@ -256,8 +374,10 @@ int main(int argc, char **argv)
                 break;
             case UI_ACTION_RECORD:
                 if (audio_state(engine) == AUDIO_STATE_IDLE) {
+                    char rec_path[PATH_CAP];
                     recording_name(rec_name, sizeof(rec_name));
-                    if (audio_start_recording(engine, rec_name, err, sizeof(err))) {
+                    dir_path(rec_path, sizeof(rec_path), rec_name);
+                    if (audio_start_recording(engine, rec_path, err, sizeof(err))) {
                         practice_take_start(&practice, SDL_GetTicks());
                         rec_start_ticks = SDL_GetTicks();
                         char toast[192];
@@ -279,7 +399,7 @@ int main(int argc, char **argv)
                         }
                         model.selected = find_file(&list, rec_name);
                         char dur[32], toast[192];
-                        format_seconds(frames, AUDIO_SAMPLE_RATE, dur, sizeof(dur));
+                        format_seconds(frames, (uint32_t)audio_record_rate(engine), dur, sizeof(dur));
                         snprintf(toast, sizeof(toast), "Saved %s (%s)", rec_name, dur);
                         ui_set_status(ui, toast);
                     } else {
@@ -297,8 +417,9 @@ int main(int argc, char **argv)
                         if (audio_state(engine) == AUDIO_STATE_PLAYING) {
                             audio_stop_playback(engine);
                         }
-                        if (!audio_play(engine, list.files[model.selected], err,
-                                        sizeof(err))) {
+                        char play_path[PATH_CAP];
+                        dir_path(play_path, sizeof(play_path), list.files[model.selected]);
+                        if (!audio_play(engine, play_path, err, sizeof(err))) {
                             ui_set_error(ui, err);
                         }
                     }
@@ -311,15 +432,17 @@ int main(int argc, char **argv)
                 audio_resume(engine);
                 break;
             case UI_ACTION_BROWSE:
-                open_directory(".");
+                open_directory(g_recordings_dir);
                 break;
             case UI_ACTION_DELETE:
                 if (model.selected >= 0 && model.selected < list.count) {
                     char victim[256];
                     snprintf(victim, sizeof(victim), "%s", list.files[model.selected]);
                     if (confirm_delete(window, victim)) {
+                        char victim_path[PATH_CAP];
+                        dir_path(victim_path, sizeof(victim_path), victim);
                         audio_stop_playback(engine);
-                        if (!SDL_RemovePath(victim)) {
+                        if (!SDL_RemovePath(victim_path)) {
                             ui_set_error(ui, SDL_GetError());
                             break;
                         }
@@ -336,6 +459,10 @@ int main(int argc, char **argv)
                 refresh_input_label(engine);
                 ui_set_status(ui, g_input_label);
                 break;
+            case UI_ACTION_CHOOSE_FOLDER:
+                SDL_ShowOpenFolderDialog(folder_dialog_cb, NULL, window,
+                                         g_recordings_dir, false);
+                break;
             case UI_ACTION_ABOUT:
                 show_about(window);
                 break;
@@ -343,6 +470,23 @@ int main(int argc, char **argv)
             default:
                 break;
             }
+        }
+
+        if (g_folder_picked) {
+            g_folder_picked = false;
+            if (SDL_CreateDirectory(g_picked_dir)) {
+                snprintf(g_recordings_dir, sizeof(g_recordings_dir), "%s", g_picked_dir);
+                save_settings();
+                refresh_files(&list);
+                model.selected = -1;
+                ui_set_status(ui, "Recordings folder changed");
+            } else {
+                ui_set_error(ui, "Cannot use that folder");
+            }
+        }
+        if (g_folder_pick_failed) {
+            g_folder_pick_failed = false;
+            ui_set_error(ui, "Folder dialog unavailable on this system");
         }
 
         audio_update(engine);
@@ -358,6 +502,8 @@ int main(int argc, char **argv)
         model.session_ms = practice_current_ms(&practice, now);
         model.last_take_ms = practice.last_take_ms;
         model.takes = practice.takes;
+        snprintf(g_folder_label, sizeof(g_folder_label), "Folder: %s", g_recordings_dir);
+        model.folder_label = g_folder_label;
         refresh_input_label(engine);
         model.input_label = g_input_label;
         if (practice_should_warn(&practice, now)) {

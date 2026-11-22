@@ -2,8 +2,8 @@
 #define ANGELSOUND_WAV_H
 
 /* Minimal PCM WAV reader/writer.  Kept free of SDL so the unit tests link
- * against plain C.  Recording is 16-bit mono; reading also accepts 8-bit and
- * 32-bit (int/float) sources, which the audio engine converts via SDL. */
+ * against plain C.  Recording writes whatever the capture device reports
+ * (8/16/32-bit PCM or 32-bit float); reading also accepts those formats. */
 
 #include <stdbool.h>
 #include <stddef.h>
