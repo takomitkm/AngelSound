@@ -20,13 +20,26 @@ jobs:
         include:
           - os: windows-latest
             bin: build/Release/AngelSound.exe
+            video: offscreen
           - os: macos-latest
             bin: build/AngelSound.app/Contents/MacOS/AngelSound
+            video: dummy
           - os: ubuntu-latest
             bin: build/AngelSound
+            video: offscreen
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Linux build deps
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxfixes-dev libxss-dev libxkbcommon-dev libasound2-dev \
+            libegl1-mesa-dev libgl1-mesa-dev libgbm-dev libdrm-dev
 
       - name: Configure
         shell: bash
@@ -46,7 +59,11 @@ jobs:
       - name: Smoke
         shell: bash
         env:
-          SDL_VIDEODRIVER: offscreen
+          SDL_VIDEODRIVER: ${{ matrix.video }}
           SDL_AUDIODRIVER: dummy
           ANGELSOUND_BIN: ${{ matrix.bin }}
-        run: '"$ANGELSOUND_BIN" --smoke'
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            export SDL_RENDER_DRIVER=software
+          fi
+          "$ANGELSOUND_BIN" --smoke

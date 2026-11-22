@@ -205,6 +205,9 @@ void ui_destroy(Ui *ui)
 
 void ui_set_status(Ui *ui, const char *text)
 {
+    if (ui == NULL) {
+        return;
+    }
     snprintf(ui->status, sizeof(ui->status), "%s", text);
     ui->status_until = SDL_GetTicks() + 4000;
     ui->status_is_error = false;
@@ -212,6 +215,9 @@ void ui_set_status(Ui *ui, const char *text)
 
 void ui_set_error(Ui *ui, const char *text)
 {
+    if (ui == NULL) {
+        return;
+    }
     snprintf(ui->status, sizeof(ui->status), "%s", text);
     ui->status_until = SDL_GetTicks() + 6000;
     ui->status_is_error = true;

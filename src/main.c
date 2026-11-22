@@ -192,17 +192,24 @@ int main(int argc, char **argv)
                                           1080, 690,
                                           SDL_WINDOW_RESIZABLE |
                                               SDL_WINDOW_HIGH_PIXEL_DENSITY);
-    if (window == NULL) {
+    if (window == NULL && !smoke) {
         fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
         return 1;
     }
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
-    if (renderer == NULL) {
+    SDL_Renderer *renderer = window != NULL ? SDL_CreateRenderer(window, NULL) : NULL;
+    if (renderer != NULL) {
+        SDL_SetRenderLogicalPresentation(renderer, UI_LOGICAL_W, UI_LOGICAL_H,
+                                         SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    } else if (!smoke) {
         fprintf(stderr, "SDL_CreateRenderer: %s\n", SDL_GetError());
         return 1;
     }
-    SDL_SetRenderLogicalPresentation(renderer, UI_LOGICAL_W, UI_LOGICAL_H,
-                                     SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    if (smoke) {
+        printf("smoke: video=%s renderer=%s\n",
+               SDL_GetCurrentVideoDriver() != NULL ? SDL_GetCurrentVideoDriver() : "none",
+               renderer != NULL ? "yes" : "no");
+        fflush(stdout);
+    }
 
     char err[256];
     AudioEngine *engine = NULL;
@@ -213,9 +220,11 @@ int main(int argc, char **argv)
     }
 
     Ui *ui = NULL;
-    if (!ui_create(window, renderer, &ui, err, sizeof(err))) {
+    if (renderer != NULL && !ui_create(window, renderer, &ui, err, sizeof(err))) {
         fprintf(stderr, "ui_create: %s\n", err);
-        return 1;
+        if (!smoke) {
+            return 1;
+        }
     }
 
     FileList list = { 0 };
@@ -240,7 +249,7 @@ int main(int argc, char **argv)
                 running = false;
                 continue;
             }
-            UiAction action = ui_handle_event(ui, &e, &model);
+            UiAction action = ui != NULL ? ui_handle_event(ui, &e, &model) : UI_ACTION_NONE;
             switch (action) {
             case UI_ACTION_QUIT:
                 running = false;
@@ -357,7 +366,9 @@ int main(int argc, char **argv)
         }
         model.practice_warn = practice_current_ms(&practice, now) >= PRACTICE_WARN_MS;
 
-        ui_render(ui, &model);
+        if (ui != NULL && renderer != NULL) {
+            ui_render(ui, &model);
+        }
 
         if (smoke && ++smoke_frames >= 5) {
             running = false;
@@ -367,10 +378,16 @@ int main(int argc, char **argv)
     }
 
     audio_shutdown(engine);
-    ui_destroy(ui);
+    if (ui != NULL) {
+        ui_destroy(ui);
+    }
     filelist_free(&list);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
+    if (renderer != NULL) {
+        SDL_DestroyRenderer(renderer);
+    }
+    if (window != NULL) {
+        SDL_DestroyWindow(window);
+    }
     SDL_Quit();
     return 0;
 }
