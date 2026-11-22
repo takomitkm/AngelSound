@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build-test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bin: build/Release/AngelSound.exe
+          - os: macos-latest
+            bin: build/AngelSound.app/Contents/MacOS/AngelSound
+          - os: ubuntu-latest
+            bin: build/AngelSound
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        shell: bash
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DANGELSOUND_USE_SYSTEM_SDL3=OFF
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --config Release --parallel 4
+
+      - name: Test
+        shell: bash
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Smoke
+        shell: bash
+        env:
+          SDL_VIDEODRIVER: offscreen
+          SDL_AUDIODRIVER: dummy
+          ANGELSOUND_BIN: ${{ matrix.bin }}
+        run: '"$ANGELSOUND_BIN" --smoke'

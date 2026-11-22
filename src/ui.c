@@ -17,6 +17,7 @@
 
 /* palette */
 static const SDL_FRect g_list_rect = { LIST_X, LIST_Y, LIST_W, LIST_H };
+static const SDL_FRect g_bg_rect = { 0, 0, UI_LOGICAL_W, UI_LOGICAL_H };
 
 typedef struct {
     SDL_FRect rect;
@@ -114,28 +115,43 @@ static void clamp_view(UiModel *m)
     }
 }
 
+static void add_button(UiButton *buttons, int *count, float x, float y, float w,
+                       float h, const char *label, UiAction action, bool enabled,
+                       int style)
+{
+    UiButton *b = &buttons[*count];
+    b->rect.x = x;
+    b->rect.y = y;
+    b->rect.w = w;
+    b->rect.h = h;
+    b->label = label;
+    b->action = action;
+    b->enabled = enabled;
+    b->style = style;
+    (*count)++;
+}
+
 static int layout_buttons(const UiModel *m, UiButton *buttons, int cap)
 {
     int n = 0;
     bool has_sel = m->selected >= 0 && m->selected < m->file_count;
     AudioState st = m->audio_state;
 
-    buttons[n++] = (UiButton){ { RIGHT_X, 56, 128, 40 }, "Record", UI_ACTION_RECORD,
-                               st == AUDIO_STATE_IDLE, 1 };
-    buttons[n++] = (UiButton){ { RIGHT_X + 144, 56, 128, 40 }, "Stop", UI_ACTION_STOP,
-                               st == AUDIO_STATE_RECORDING, 2 };
-    buttons[n++] = (UiButton){ { RIGHT_X, 108, 84, 32 }, "Play", UI_ACTION_PLAY,
-                               has_sel, 3 };
-    buttons[n++] = (UiButton){ { RIGHT_X + 92, 108, 84, 32 }, "Pause", UI_ACTION_PAUSE,
-                               st == AUDIO_STATE_PLAYING, 3 };
-    buttons[n++] = (UiButton){ { RIGHT_X + 184, 108, 88, 32 }, "Resume", UI_ACTION_RESUME,
-                               st == AUDIO_STATE_PAUSED, 3 };
-    buttons[n++] = (UiButton){ { RIGHT_X, 152, 128, 32 }, "Browse", UI_ACTION_BROWSE, true, 0 };
-    buttons[n++] = (UiButton){ { RIGHT_X + 144, 152, 128, 32 }, "Delete", UI_ACTION_DELETE,
-                               has_sel && st != AUDIO_STATE_RECORDING, 0 };
-    buttons[n++] = (UiButton){ { RIGHT_X, 196, RIGHT_W, 32 }, m->input_label,
-                               UI_ACTION_CYCLE_INPUT, true, 0 };
-    buttons[n++] = (UiButton){ { RIGHT_X, 240, 128, 32 }, "About", UI_ACTION_ABOUT, true, 0 };
+    add_button(buttons, &n, RIGHT_X, 56, 128, 40, "Record", UI_ACTION_RECORD,
+               st == AUDIO_STATE_IDLE, 1);
+    add_button(buttons, &n, RIGHT_X + 144, 56, 128, 40, "Stop", UI_ACTION_STOP,
+               st == AUDIO_STATE_RECORDING, 2);
+    add_button(buttons, &n, RIGHT_X, 108, 84, 32, "Play", UI_ACTION_PLAY, has_sel, 3);
+    add_button(buttons, &n, RIGHT_X + 92, 108, 84, 32, "Pause", UI_ACTION_PAUSE,
+               st == AUDIO_STATE_PLAYING, 3);
+    add_button(buttons, &n, RIGHT_X + 184, 108, 88, 32, "Resume", UI_ACTION_RESUME,
+               st == AUDIO_STATE_PAUSED, 3);
+    add_button(buttons, &n, RIGHT_X, 152, 128, 32, "Browse", UI_ACTION_BROWSE, true, 0);
+    add_button(buttons, &n, RIGHT_X + 144, 152, 128, 32, "Delete", UI_ACTION_DELETE,
+               has_sel && st != AUDIO_STATE_RECORDING, 0);
+    add_button(buttons, &n, RIGHT_X, 196, RIGHT_W, 32, m->input_label,
+               UI_ACTION_CYCLE_INPUT, true, 0);
+    add_button(buttons, &n, RIGHT_X, 240, 128, 32, "About", UI_ACTION_ABOUT, true, 0);
     (void)cap;
     return n;
 }
@@ -335,7 +351,7 @@ void ui_render(Ui *ui, UiModel *m)
     SDL_Renderer *r = ui->renderer;
     clamp_view(m);
 
-    fill_rect(r, (SDL_FRect){ 0, 0, UI_LOGICAL_W, UI_LOGICAL_H }, 24, 26, 32, 255);
+    fill_rect(r, g_bg_rect, 24, 26, 32, 255);
 
     draw_text(r, 16, 14, "AngelSound", 96, 165, 250);
     draw_text(r, 16 + 11 * 8 + 8, 14, "- pseudo-voice practice recorder", 150, 156, 170);
