@@ -25,6 +25,31 @@ static unsigned rd16(const unsigned char *p)
     return (unsigned)p[0] | ((unsigned)p[1] << 8);
 }
 
+static void put16(unsigned char *p, unsigned v)
+{
+    p[0] = (unsigned char)(v & 0xff);
+    p[1] = (unsigned char)((v >> 8) & 0xff);
+}
+
+static void put32(unsigned char *p, unsigned v)
+{
+    p[0] = (unsigned char)(v & 0xff);
+    p[1] = (unsigned char)((v >> 8) & 0xff);
+    p[2] = (unsigned char)((v >> 16) & 0xff);
+    p[3] = (unsigned char)((v >> 24) & 0xff);
+}
+
+static bool write_bytes(const char *path, const unsigned char *data, size_t len)
+{
+    FILE *f = fopen(path, "wb");
+    if (f == NULL) {
+        return false;
+    }
+    bool ok = fwrite(data, 1, len, f) == len;
+    fclose(f);
+    return ok;
+}
+
 static long file_size(const char *path)
 {
     FILE *f = fopen(path, "rb");
@@ -101,6 +126,92 @@ int main(void)
     CHECK(wav_writer_close(&w2));
     CHECK(wav_read(path, &a, err, sizeof(err)));
     CHECK(a.data_bytes == 0);
+    wav_audio_free(&a);
+    remove(path);
+
+    /* WAVE_FORMAT_EXTENSIBLE with a PCM SubFormat (tag at fmt body + 24). */
+    unsigned char ext[70];
+    memset(ext, 0, sizeof(ext));
+    memcpy(ext, "RIFF", 4);
+    put32(ext + 4, (unsigned)sizeof(ext) - 8);
+    memcpy(ext + 8, "WAVE", 4);
+    memcpy(ext + 12, "fmt ", 4);
+    put32(ext + 16, 40);
+    put16(ext + 20, 0xFFFE);
+    put16(ext + 22, 1);
+    put32(ext + 24, 44100);
+    put32(ext + 28, 88200);
+    put16(ext + 32, 2);
+    put16(ext + 34, 16);
+    put16(ext + 36, 22); /* cbSize */
+    put16(ext + 38, 16); /* valid bits */
+    put32(ext + 40, 0);  /* channel mask */
+    put16(ext + 44, 1);  /* SubFormat GUID first two bytes = PCM */
+    memcpy(ext + 60, "data", 4);
+    put32(ext + 64, 2);
+    ext[68] = 1;
+    ext[69] = 2;
+    CHECK(write_bytes(path, ext, sizeof(ext)));
+    CHECK(wav_read(path, &a, err, sizeof(err)));
+    CHECK(a.channels == 1);
+    CHECK(a.sample_rate == 44100);
+    CHECK(a.bits_per_sample == 16);
+    CHECK(a.data_bytes == 2);
+    wav_audio_free(&a);
+    remove(path);
+
+    /* 32-bit float round-trip */
+    WavWriter wf;
+    CHECK(wav_writer_open(&wf, path, 1, 48000, 32, true, err, sizeof(err)));
+    const unsigned char floats[8] = { 0, 0, 0x80, 0x3f, 0, 0, 0, 0xbf };
+    CHECK(wav_writer_write(&wf, floats, sizeof(floats)));
+    CHECK(wav_writer_close(&wf));
+    CHECK(wav_read(path, &a, err, sizeof(err)));
+    CHECK(a.bits_per_sample == 32);
+    CHECK(a.is_float);
+    CHECK(a.data_bytes == sizeof(floats));
+    wav_audio_free(&a);
+    remove(path);
+
+    /* 24-bit PCM has no SDL/WAV path here and must be rejected */
+    unsigned char pcm24[47];
+    memset(pcm24, 0, sizeof(pcm24));
+    memcpy(pcm24, "RIFF", 4);
+    put32(pcm24 + 4, 39);
+    memcpy(pcm24 + 8, "WAVE", 4);
+    memcpy(pcm24 + 12, "fmt ", 4);
+    put32(pcm24 + 16, 16);
+    put16(pcm24 + 20, 1);
+    put16(pcm24 + 22, 1);
+    put32(pcm24 + 24, 44100);
+    put32(pcm24 + 28, 132300);
+    put16(pcm24 + 32, 3);
+    put16(pcm24 + 34, 24);
+    memcpy(pcm24 + 36, "data", 4);
+    put32(pcm24 + 40, 3);
+    CHECK(write_bytes(path, pcm24, sizeof(pcm24)));
+    CHECK(!wav_read(path, &a, err, sizeof(err)));
+    remove(path);
+
+    /* a data chunk that claims more bytes than the file holds is clamped */
+    unsigned char short_data[48];
+    memset(short_data, 0, sizeof(short_data));
+    memcpy(short_data, "RIFF", 4);
+    put32(short_data + 4, 40);
+    memcpy(short_data + 8, "WAVE", 4);
+    memcpy(short_data + 12, "fmt ", 4);
+    put32(short_data + 16, 16);
+    put16(short_data + 20, 1);
+    put16(short_data + 22, 1);
+    put32(short_data + 24, 44100);
+    put32(short_data + 28, 88200);
+    put16(short_data + 32, 2);
+    put16(short_data + 34, 16);
+    memcpy(short_data + 36, "data", 4);
+    put32(short_data + 40, 100);
+    CHECK(write_bytes(path, short_data, sizeof(short_data)));
+    CHECK(wav_read(path, &a, err, sizeof(err)));
+    CHECK(a.data_bytes == 4);
     wav_audio_free(&a);
     remove(path);
 

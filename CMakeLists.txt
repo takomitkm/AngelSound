@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.21)
-project(AngelSound VERSION 0.2.0 LANGUAGES C)
+project(AngelSound VERSION 0.3.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(ANGELSOUND_USE_SYSTEM_SDL3 "Prefer an installed SDL3 over FetchContent" ON)
 option(ANGELSOUND_BUILD_TESTS "Build the unit tests" ON)
@@ -17,7 +18,7 @@ else()
 endif()
 
 # --- SDL3 ---------------------------------------------------------------------
-if(ANGELSOUND_USE_SYSTEM_SDL3)
+if(ANGELSOUND_USE_SYSTEM_SDL3 AND NOT ANDROID)
     find_package(SDL3 3.2 CONFIG QUIET)
 endif()
 if(NOT TARGET SDL3::SDL3)
@@ -25,6 +26,11 @@ if(NOT TARGET SDL3::SDL3)
     set(SDL_TESTS OFF CACHE BOOL "" FORCE)
     set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
+    if(ANDROID)
+        # SDLActivity loads libSDL3.so before libmain.so.
+        set(SDL_SHARED ON CACHE BOOL "" FORCE)
+        set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    endif()
     FetchContent_Declare(SDL3
         URL https://github.com/libsdl-org/SDL/releases/download/release-3.4.20/SDL3-3.4.20.tar.gz
         URL_HASH SHA256=f3bb06f55bed9557227a700af2ea62e49497ebdf58037732a731a5fb3ef8581f
@@ -35,21 +41,35 @@ endif()
 # --- targets ------------------------------------------------------------------
 add_library(angelsound_common STATIC
     src/wav.c
-    src/practice.c)
+    src/practice.c
+    src/recordlist.c
+    src/ui_layout.c
+    src/storage_pure.c)
 target_include_directories(angelsound_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-add_library(angelsound_audio STATIC src/audio.c)
+add_library(angelsound_audio STATIC src/audio.c src/audio_format.c)
 target_link_libraries(angelsound_audio PUBLIC angelsound_common SDL3::SDL3)
 
-add_executable(AngelSound src/main.c src/ui.c)
-target_link_libraries(AngelSound PRIVATE angelsound_audio SDL3::SDL3)
-target_include_directories(AngelSound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+if(ANDROID)
+    add_library(AngelSound SHARED
+        src/main.c
+        src/ui.c
+        src/storage.c
+        src/android_storage.c)
+    target_link_libraries(AngelSound PRIVATE angelsound_audio log android)
+    target_include_directories(AngelSound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    set_target_properties(AngelSound PROPERTIES OUTPUT_NAME "main")
+else()
+    add_executable(AngelSound src/main.c src/ui.c src/storage.c)
+    target_link_libraries(AngelSound PRIVATE angelsound_audio)
+    target_include_directories(AngelSound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+endif()
 
 if(WIN32 AND ANGELSOUND_WINDOWS_GUI)
     set_target_properties(AngelSound PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
-if(APPLE)
+if(APPLE AND NOT ANDROID)
     set_target_properties(AngelSound PROPERTIES
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Info.plist.in")
@@ -68,7 +88,7 @@ if(WIN32 AND TARGET SDL3::SDL3)
 endif()
 
 # --- tests --------------------------------------------------------------------
-if(ANGELSOUND_BUILD_TESTS)
+if(ANGELSOUND_BUILD_TESTS AND NOT ANDROID)
     enable_testing()
     add_subdirectory(tests)
 endif()

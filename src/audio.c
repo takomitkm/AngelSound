@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "audio_format.h"
+
 struct AudioEngine {
     SDL_AudioDeviceID *inputs;
     int input_count;
@@ -27,31 +29,6 @@ struct AudioEngine {
 
 /* WAV can store 8-bit unsigned PCM, 16/32-bit little-endian PCM, or 32-bit
  * float.  Anything else would need a conversion, which we deliberately avoid. */
-static bool capture_format_ok(const SDL_AudioSpec *spec, char *err, size_t errcap)
-{
-    SDL_AudioFormat fmt = spec->format;
-    int bits = fmt & SDL_AUDIO_MASK_BITSIZE;
-    bool is_float = (fmt & SDL_AUDIO_MASK_FLOAT) != 0;
-    bool is_big = (fmt & SDL_AUDIO_MASK_BIG_ENDIAN) != 0;
-    bool is_signed = (fmt & SDL_AUDIO_MASK_SIGNED) != 0;
-
-    bool ok = spec->channels >= 1 && spec->channels <= 8 && spec->freq > 0 &&
-              !is_big;
-    if (ok && is_float) {
-        ok = bits == 32;
-    } else if (ok && bits == 8) {
-        ok = !is_signed;
-    } else if (ok) {
-        ok = bits == 16 || bits == 32;
-    }
-    if (!ok) {
-        snprintf(err, errcap,
-                 "unsupported capture format (format=0x%x, %d ch, %d Hz)",
-                 (unsigned)spec->format, spec->channels, spec->freq);
-    }
-    return ok;
-}
-
 static void close_recording(AudioEngine *a)
 {
     if (a->rec_stream != NULL) {
@@ -209,12 +186,16 @@ bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t e
         SDL_CloseAudioDevice(dev);
         return false;
     }
-    if (!capture_format_ok(&spec, err, errcap)) {
+    int bits = 0;
+    bool is_float = false;
+    if (!audio_format_supported((uint32_t)spec.format, spec.channels, spec.freq,
+                                &bits, &is_float)) {
+        snprintf(err, errcap,
+                 "unsupported capture format (format=0x%x, %d ch, %d Hz)",
+                 (unsigned)spec.format, spec.channels, spec.freq);
         SDL_CloseAudioDevice(dev);
         return false;
     }
-    int bits = spec.format & SDL_AUDIO_MASK_BITSIZE;
-    bool is_float = (spec.format & SDL_AUDIO_MASK_FLOAT) != 0;
 
     SDL_AudioStream *stream = SDL_CreateAudioStream(&spec, &spec);
     if (stream == NULL) {
