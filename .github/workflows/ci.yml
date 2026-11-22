@@ -38,7 +38,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
-            libxfixes-dev libxss-dev libxkbcommon-dev libasound2-dev \
+            libxfixes-dev libxss-dev libxkbcommon-dev libxtst-dev libxrender-dev \
+            libasound2-dev \
             libegl1-mesa-dev libgl1-mesa-dev libgbm-dev libdrm-dev
 
       - name: Configure
