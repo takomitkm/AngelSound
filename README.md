@@ -1,9 +1,9 @@
 # AngelSound
 
 伪声练习录音机。原版是 [MoeDisk/AngelSound](https://github.com/MoeDisk/AngelSound) 的 Delphi VCL 小程序；
-这个分支把它重写成 **纯 C + SDL3**，不依赖 Qt / .NET，Windows、macOS、Linux 共用一套源码。
+这个分支把它重写成 **纯 C + SDL3**，Windows、macOS、Linux 共用一套源码。
 
-原始 Delphi 文件（`Project1.dpr`、`Unit1.pas`、`Unit1.dfm`…）保留在根目录，方便对照。
+上游 Delphi/VCL 源码不在本分支，见上面链接。
 
 ## 功能
 
@@ -65,6 +65,18 @@ src/
 tests/        test_wav、test_practice（ctest）
 ```
 
+## 上游依赖（供对照）
+
+原版是 Delphi/VCL 程序，不是 Qt 也不是 .NET：
+
+- **Embarcadero Delphi**（Object Pascal + VCL；`Project1.dproj`、`Unit1.dfm`）
+- **AlphaControls**：`sSkinManager`、`sStatusBar`、`sListBox`、`sTabControl`、`acPNG` 等
+  第三方 VCL 皮肤控件（皮肤数据内嵌在 `Unit1.dfm`）
+- **Windows API**：录音/播放走 MCI（`TMediaPlayer` → winmm）、`ShellExecute`（ShellAPI）、
+  `RunDLL32 Mmsys.cpl` 打开录音设置
+
+所以原版只能在 Windows 上用 Delphi 编译。
+
 ## 与原版的差异
 
 - 录音质量从 8-bit / 11.025 kHz 提升到 16-bit / 44.1 kHz（旧 8-bit WAV 仍可播放）。
@@ -72,4 +84,4 @@ tests/        test_wav、test_practice（ctest）
 - “录好辣”等弹窗改成底部状态提示；“删除”改为真正的确认框。
 - Windows 专用按钮（CMD / 录音设置 / 附件目录）没有照搬，改为跨平台的“打开录音目录”。
 
-原版 UI 文案与作者信息见 `Unit1.pas` / `Unit1.dfm`。
+原版 UI 文案与作者信息见上游仓库。
