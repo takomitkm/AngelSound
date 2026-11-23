@@ -39,7 +39,7 @@ Entry points: CTest `test_*` executables + `AngelSound --smoke` in CI.
 | FM-16 | Microphone permission denied → silent failure | wrong status | state machine pending/granted/denied + toast; desktop smoke has permission absent | code + smoke |
 | FM-17 | SDL init/window/renderer unavailable in CI | false test failure | smoke degrades to init-only, prints video/renderer; three-platform CI | `--smoke` |
 | FM-18 | MSVC/C99 compound literal portability | build failure | cl 19.44 builds on school host; CI windows-latest | CI matrix |
-| FM-19 | Android Gradle/SDL/CMake wiring broken | build failure | assembleDebug in CI job (added in this change) | CI android job |
+| FM-19 | Android Gradle/SDL/CMake wiring broken | build failure | assembleDebug in CI job; three real failures caught and fixed: retired `tools` SDK package, stale gradle-wrapper.jar (wrapper validation), `DOWNLOAD_EXTRACT_TIMESTAMP` on CMake 3.22 | CI android job |
 
 EXCLUDED (with reason):
 - Real microphone capture / actual WAV byte content from device: CI uses dummy
@@ -88,6 +88,10 @@ EXCLUDED (with reason):
   L0: CHECK PASS (clangd 16/16 + clice 0 findings on the local host), CMake build
   0 warnings, CTest 6/6 passed, smoke OK. Git tree fingerprint recorded in the
   commit above this run.
+- 2026-11-23, CI run 45085852673 (L2): windows/ubuntu/macos build-test all green
+  (6/6 ctest, smoke renderer=yes each), android assembleDebug green and APK
+  artifact uploaded (2.6 MB). Android compile-level gate now passes; runtime
+  (mic, SAF) still NEEDS_PORT to a real device.
 - 2026-11-23, failure triage: red-green above is code-failure evidence, not an
   environment failure; WSL UNC header access was an environment issue and was
   removed by copying mingw headers into `S:\apps\check\mingw-include` (not counted
