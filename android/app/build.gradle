@@ -7,6 +7,10 @@ android {
     compileSdk 35
     ndkVersion = "28.2.13676358"
 
+    buildFeatures {
+        prefab true
+    }
+
     defaultConfig {
         applicationId "moe.aimo.angelsound"
         minSdk 21
@@ -18,7 +22,7 @@ android {
             cmake {
                 arguments "-DANDROID_PLATFORM=android-21",
                           "-DANDROID_STL=c++_static",
-                          "-DANGELSOUND_USE_SYSTEM_SDL3=OFF",
+                          "-DANGELSOUND_USE_SYSTEM_SDL3=ON",
                           "-DANGELSOUND_BUILD_TESTS=OFF"
                 abiFilters 'arm64-v8a', 'x86_64'
             }
@@ -43,4 +47,7 @@ android {
 }
 
 dependencies {
+    // SDL3 AAR is downloaded by CI into libs/ from the official 3.4.20
+    // release; it supplies both org.libsdl.app.* and the Prefab native lib.
+    implementation files('libs/SDL3-3.4.20.aar')
 }

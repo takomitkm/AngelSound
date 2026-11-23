@@ -101,6 +101,25 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Download SDL3 Android AAR
+        shell: bash
+        working-directory: android
+        env:
+          SDL3_AAR_VERSION: '3.4.20'
+          SDL3_ZIP_SHA256: '535320e58f3bd7235b3e15f940595cdeeb9b8c0aa6b3810ff127345e3567d4da'
+          SDL3_AAR_SHA256: 'e5eec5e3d0293cbe9ce5899d451eaaf00a5c9ed70c1e444b751932118714e170'
+        run: |
+          set -euo pipefail
+          zip="SDL3-devel-${SDL3_AAR_VERSION}-android.zip"
+          aar="SDL3-${SDL3_AAR_VERSION}.aar"
+          curl -fsSL --retry 3 -o "$zip" \
+            "https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_AAR_VERSION}/${zip}"
+          echo "${SDL3_ZIP_SHA256}  ${zip}" | sha256sum --check -
+          mkdir -p app/libs
+          unzip -o -j "$zip" "$aar" -d app/libs
+          echo "${SDL3_AAR_SHA256}  app/libs/${aar}" | sha256sum --check -
+          test -s "app/libs/${aar}"
+
       - name: Build APK
         shell: bash
         working-directory: android

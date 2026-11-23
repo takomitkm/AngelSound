@@ -27,8 +27,26 @@
 - SDL3 ≥ 3.2
   - 默认优先用系统安装的 SDL3；找不到时由 CMake 通过 FetchContent 拉取
     **SDL3 3.4.20**（带 SHA-256 校验）
+  - Android 改由官方 **SDL3 3.4.20 AAR** 提供 Java 类和 Prefab 原生库；
+    AAR 由 CI 下载并校验 SHA-256，不提交进仓库
 
-## 构建
+## Android 构建
+
+Android 端使用 SDL3 官方 AAR（`SDL3-devel-3.4.20-android.zip` 内的
+`SDL3-3.4.20.aar`），Java 与原生层来自同一个版本。GitHub Actions 的
+`android (assembleDebug)` 任务会自动下载、校验并放入 `android/app/libs/`，
+然后运行 Gradle；桌面端仍沿用系统 SDL3 / FetchContent 策略。
+
+本地复现 Android 构建时，先手工把该 AAR 放进 `android/app/libs/`，再执行：
+
+```sh
+cd android
+./gradlew :app:assembleDebug
+```
+
+`android/app/libs/*.aar` 已在 `.gitignore` 中排除，不会误提交二进制文件。
+
+## 桌面构建
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

@@ -39,7 +39,7 @@ Entry points: CTest `test_*` executables + `AngelSound --smoke` in CI.
 | FM-16 | Microphone permission denied → silent failure | wrong status | state machine pending/granted/denied + toast; desktop smoke has permission absent | code + smoke |
 | FM-17 | SDL init/window/renderer unavailable in CI | false test failure | smoke degrades to init-only, prints video/renderer; three-platform CI | `--smoke` |
 | FM-18 | MSVC/C99 compound literal portability | build failure | cl 19.44 builds on school host; CI windows-latest | CI matrix |
-| FM-19 | Android Gradle/SDL/CMake wiring broken | build failure | assembleDebug in CI job; three real failures caught and fixed: retired `tools` SDK package, stale gradle-wrapper.jar (wrapper validation), `DOWNLOAD_EXTRACT_TIMESTAMP` on CMake 3.22 | CI android job |
+| FM-19 | Android Gradle/SDL/CMake wiring broken | build failure | assembleDebug in CI job; three real failures caught and fixed: retired `tools` SDK package, stale gradle-wrapper.jar (wrapper validation), `DOWNLOAD_EXTRACT_TIMESTAMP` on CMake 3.22; AAR/Prefab migration replaces the vendored SDL Java tree and FetchContent SDL with the official SDL3 3.4.20 AAR, downloaded and SHA-256 checked in CI | CI android job |
 
 EXCLUDED (with reason):
 - Real microphone capture / actual WAV byte content from device: CI uses dummy

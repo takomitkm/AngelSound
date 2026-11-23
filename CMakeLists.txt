@@ -18,7 +18,11 @@ else()
 endif()
 
 # --- SDL3 ---------------------------------------------------------------------
-if(ANGELSOUND_USE_SYSTEM_SDL3 AND NOT ANDROID)
+if(ANDROID AND ANGELSOUND_USE_SYSTEM_SDL3)
+    # Android uses the SDL3 AAR's Prefab package; it supplies the headers and
+    # the shared libSDL3.so that SDLActivity loads.
+    find_package(SDL3 REQUIRED CONFIG)
+elseif(ANGELSOUND_USE_SYSTEM_SDL3)
     find_package(SDL3 3.2 CONFIG QUIET)
 endif()
 if(NOT TARGET SDL3::SDL3)
