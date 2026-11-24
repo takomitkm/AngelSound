@@ -418,8 +418,15 @@ int main(int argc, char **argv)
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
+#if defined(__ANDROID__)
+                /* SDLActivity sends QUIT when the Activity is destroyed (e.g. while
+                 * a SAF picker is on top).  Keep the native loop alive so the
+                 * folder result can still be polled through JNI. */
+                continue;
+#else
                 running = false;
                 continue;
+#endif
             }
             UiAction action = app.ui != NULL ? ui_handle_event(app.ui, &e, &app.model)
                                              : UI_ACTION_NONE;
