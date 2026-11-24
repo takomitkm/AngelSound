@@ -418,8 +418,15 @@ int main(int argc, char **argv)
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
+#if defined(__ANDROID__)
+                /* SDLActivity sends QUIT when the Activity is pushed to the
+                 * background (e.g. by the SAF picker).  Keep the native loop
+                 * alive so getPickedUri() can poll the persisted permission. */
+                continue;
+#else
                 running = false;
                 continue;
+#endif
             }
             UiAction action = app.ui != NULL ? ui_handle_event(app.ui, &e, &app.model)
                                              : UI_ACTION_NONE;
