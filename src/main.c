@@ -418,12 +418,14 @@ int main(int argc, char **argv)
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
+                SDL_Log("DIAG SDL_EVENT_QUIT received, running->false");
                 running = false;
                 continue;
             }
             UiAction action = app.ui != NULL ? ui_handle_event(app.ui, &e, &app.model)
                                              : UI_ACTION_NONE;
             if (action == UI_ACTION_QUIT) {
+                SDL_Log("DIAG UI_ACTION_QUIT received, running->false");
                 running = false;
             } else if (action != UI_ACTION_NONE) {
                 handle_action(&app, action);
