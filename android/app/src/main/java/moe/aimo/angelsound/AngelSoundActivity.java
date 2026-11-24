@@ -278,6 +278,7 @@ public class AngelSoundActivity extends SDLActivity {
                 cursor.close();
             }
         }
+        Log.i(TAG, "DIAG listWavs uri=" + uriString + " found=" + names.size());
         return names.toArray(new String[0]);
     }
 
