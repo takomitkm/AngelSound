@@ -1,5 +1,9 @@
 #include "storage.h"
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
 #include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -409,6 +413,13 @@ int storage_poll_folder(void)
 {
 #if defined(__ANDROID__)
     char *uri = android_storage_take_picked_uri();
+    if (g_folder_pending || (uri != NULL && uri[0] != '\0')) {
+        __android_log_print(ANDROID_LOG_WARN, "AngelSound",
+                            "DIAG poll uri=%s pending=%d since_deadline=%d",
+                            uri ? (uri[0] ? uri : "(empty)") : "(null)",
+                            g_folder_pending ? 1 : 0,
+                            (int)((long)SDL_GetTicks() - (long)g_folder_deadline));
+    }
     if (uri == NULL) {
         /* No SAF result yet.  If the picker has been open long enough, the
          * result is never going to arrive (the activity was destroyed), so
