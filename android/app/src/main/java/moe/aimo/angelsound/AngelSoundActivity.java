@@ -28,40 +28,11 @@ public class AngelSoundActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        Log.w(TAG, "DIAG onCreate this=" + hashCode() + " saved=" + (savedInstanceState != null));
         super.onCreate(savedInstanceState);
     }
 
     @Override
-    protected void onDestroy() {
-        Log.w(TAG, "DIAG onDestroy finishing=" + isFinishing()
-                + " changingConfig=" + isChangingConfigurations()
-                + " this=" + hashCode(), new RuntimeException("destroy stack"));
-        super.onDestroy();
-    }
-
-    @Override
-    protected void onRestart() {
-        Log.w(TAG, "DIAG onRestart this=" + hashCode());
-        super.onRestart();
-    }
-
-    @Override
-    protected void onPause() {
-        Log.w(TAG, "DIAG onPause finishing=" + isFinishing() + " this=" + hashCode());
-        super.onPause();
-    }
-
-    @Override
-    protected void onStop() {
-        Log.w(TAG, "DIAG onStop finishing=" + isFinishing() + " this=" + hashCode());
-        super.onStop();
-    }
-
-    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        Log.w(TAG, "DIAG onActivityResult req=" + requestCode + " result=" + resultCode
-                + " data=" + (data == null ? "null" : data.getData()));
         if (requestCode == REQ_PICK_FOLDER) {
             if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
                 Uri uri = data.getData();
@@ -74,10 +45,8 @@ public class AngelSoundActivity extends SDLActivity {
                     Log.w(TAG, "persistable permission failed", e);
                 }
                 sPickedUri = uri.toString();
-                Log.w(TAG, "DIAG picked uri=" + sPickedUri + " flags=" + flags);
             } else {
                 sPickedUri = "";
-                Log.w(TAG, "DIAG folder result not OK -> empty uri");
             }
             return;
         }
@@ -85,16 +54,13 @@ public class AngelSoundActivity extends SDLActivity {
     }
 
     public void pickFolder() {
-        Log.w(TAG, "DIAG pickFolder called finishing=" + isFinishing());
         runOnUiThread(() -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                     | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             try {
-                Log.w(TAG, "DIAG before startActivityForResult finishing=" + isFinishing());
                 startActivityForResult(intent, REQ_PICK_FOLDER);
-                Log.w(TAG, "DIAG after startActivityForResult");
             } catch (ActivityNotFoundException e) {
                 Log.w(TAG, "no document tree picker", e);
                 sPickedUri = "";

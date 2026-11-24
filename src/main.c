@@ -418,14 +418,19 @@ int main(int argc, char **argv)
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
-                SDL_Log("DIAG SDL_EVENT_QUIT received, running->false");
+#if defined(__ANDROID__)
+                /* SDLActivity sends QUIT when the Activity is destroyed (e.g. while
+                 * a SAF picker is on top).  Keep the native loop alive so the
+                 * folder result can still be polled through JNI. */
+                continue;
+#else
                 running = false;
                 continue;
+#endif
             }
             UiAction action = app.ui != NULL ? ui_handle_event(app.ui, &e, &app.model)
                                              : UI_ACTION_NONE;
             if (action == UI_ACTION_QUIT) {
-                SDL_Log("DIAG UI_ACTION_QUIT received, running->false");
                 running = false;
             } else if (action != UI_ACTION_NONE) {
                 handle_action(&app, action);
@@ -497,7 +502,6 @@ int main(int argc, char **argv)
         }
     }
 
-    SDL_Log("DIAG native main loop exiting");
     SDL_RemoveEventWatch(event_watch, &app);
     audio_shutdown(app.engine);
     if (app.ui != NULL) {
