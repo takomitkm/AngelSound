@@ -45,32 +45,12 @@ public class AngelSoundActivity extends SDLActivity {
                     Log.w(TAG, "persistable permission failed", e);
                 }
                 sPickedUri = uri.toString();
-                persistFolder(sPickedUri);
             } else {
                 sPickedUri = "";
             }
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
-    }
-
-    /* The native loop may have been torn down while the SAF picker was on
-     * top, so it can miss the usual JNI poll.  Write the picked URI straight
-     * to the settings file the native side reads on startup. */
-    private void persistFolder(String uri) {
-        File settings = new File(getFilesDir(), "settings.txt");
-        FileOutputStream out = null;
-        try {
-            out = new FileOutputStream(settings, false);
-            out.write(("recordings_dir=" + uri + "\n").getBytes("UTF-8"));
-            out.flush();
-        } catch (Exception e) {
-            Log.w(TAG, "persist folder failed", e);
-        } finally {
-            if (out != null) {
-                try { out.close(); } catch (Exception ignored) { }
-            }
-        }
     }
 
     public void pickFolder() {

@@ -418,14 +418,8 @@ int main(int argc, char **argv)
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
-#if defined(__ANDROID__)
-                /* Keep the native loop alive while a SAF picker covers the
-                 * activity so getPickedUri() can still be polled. */
-                continue;
-#else
                 running = false;
                 continue;
-#endif
             }
             UiAction action = app.ui != NULL ? ui_handle_event(app.ui, &e, &app.model)
                                              : UI_ACTION_NONE;
