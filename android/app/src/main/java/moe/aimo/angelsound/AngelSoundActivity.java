@@ -46,8 +46,6 @@ public class AngelSoundActivity extends SDLActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        Log.w(TAG, "DIAG result req=" + requestCode + " code=" + resultCode
-                + " data=" + (data == null ? "null" : data.getData()));
         if (requestCode == REQ_PICK_FOLDER) {
             /* Some ROMs hand back RESULT_CANCELED together with a valid tree
              * URI, so trust the payload instead of the result code. */
@@ -278,7 +276,6 @@ public class AngelSoundActivity extends SDLActivity {
                 cursor.close();
             }
         }
-        Log.w(TAG, "DIAG listWavs uri=" + uriString + " found=" + names.size());
         return names.toArray(new String[0]);
     }
 
