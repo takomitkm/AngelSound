@@ -69,6 +69,8 @@ int ui_visible_rows(void);
 void ui_clamp_selection(UiModel *m);
 /* Portrait switches the canvas height and moves the buttons under the list. */
 void ui_set_portrait(bool portrait);
+/* Portrait canvas height, normally derived from the window aspect. */
+void ui_set_portrait_size(float canvas_h);
 bool ui_is_portrait(void);
 float ui_canvas_h(void);
 /* Right-hand column used by the landscape layout; equal to the canvas width

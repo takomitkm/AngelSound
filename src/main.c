@@ -330,6 +330,8 @@ static bool event_watch(void *userdata, SDL_Event *e)
 }
 
 static bool g_presentation_set;
+static bool g_last_portrait;
+static int g_last_canvas_h;
 #if defined(__ANDROID__)
 /* Set once a folder pick has been observed, so the loop can end after the
  * picker result lands and the activity is gone. */
@@ -350,14 +352,28 @@ static void apply_ui_mode(SDL_Window *window, SDL_Renderer *renderer)
     int w = 0;
     int h = 0;
     SDL_GetWindowSize(window, &w, &h);
-    bool portrait = h > w;
-    if (g_presentation_set && portrait == ui_is_portrait()) {
+    if (w <= 0 || h <= 0) {
         return;
     }
-    ui_set_portrait(portrait);
-    SDL_SetRenderLogicalPresentation(renderer, UI_LOGICAL_W, (int)ui_canvas_h(),
+    bool portrait = h > w;
+    if (portrait) {
+        /* Match the canvas to the surface aspect so the UI fills the screen
+         * instead of being letterboxed away from the edges. */
+        ui_set_portrait(true);
+        ui_set_portrait_size((float)UI_LOGICAL_W * (float)h / (float)w + 0.5f);
+    } else {
+        ui_set_portrait(false);
+    }
+    int canvas_h = (int)ui_canvas_h();
+    if (g_presentation_set && portrait == g_last_portrait &&
+        canvas_h == g_last_canvas_h) {
+        return;
+    }
+    SDL_SetRenderLogicalPresentation(renderer, UI_LOGICAL_W, canvas_h,
                                      SDL_LOGICAL_PRESENTATION_LETTERBOX);
     g_presentation_set = true;
+    g_last_portrait = portrait;
+    g_last_canvas_h = canvas_h;
 }
 
 int main(int argc, char **argv)

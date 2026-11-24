@@ -21,10 +21,22 @@
 #define PORTRAIT_COL 332.0f
 
 static bool g_portrait;
+static float g_portrait_h = (float)UI_PORTRAIT_H;
 
 void ui_set_portrait(bool portrait)
 {
     g_portrait = portrait;
+}
+
+void ui_set_portrait_size(float canvas_h)
+{
+    if (canvas_h < 1120.0f) {
+        canvas_h = 1120.0f;
+    }
+    if (canvas_h > 1600.0f) {
+        canvas_h = 1600.0f;
+    }
+    g_portrait_h = canvas_h;
 }
 
 bool ui_is_portrait(void)
@@ -34,7 +46,7 @@ bool ui_is_portrait(void)
 
 float ui_canvas_h(void)
 {
-    return g_portrait ? (float)UI_PORTRAIT_H : (float)UI_LOGICAL_H;
+    return g_portrait ? g_portrait_h : (float)UI_LOGICAL_H;
 }
 
 float ui_right_x(void)
