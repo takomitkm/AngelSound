@@ -1,7 +1,9 @@
 package moe.aimo.angelsound;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -47,6 +49,13 @@ public class AngelSoundActivity extends SDLActivity {
                 sPickedUri = uri.toString();
             } else {
                 sPickedUri = "";
+            }
+            /* The picker may leave this task behind the launcher.  Bring it
+             * back so the user returns to the app after choosing a folder. */
+            ActivityManager am =
+                    (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                am.moveTaskToFront(getTaskId(), 0);
             }
             return;
         }
