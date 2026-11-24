@@ -334,6 +334,10 @@ static bool g_presentation_set;
 /* Set once a folder pick has been observed, so the loop can end after the
  * picker result lands and the activity is gone. */
 static bool g_picker_seen;
+/* When the picker is gone and no result ever arrives (cancel path), give up
+ * after this long instead of leaving the native loop running forever. */
+static uint64_t g_activity_gone_since;
+#define ACTIVITY_GONE_TIMEOUT_MS 60000
 #endif
 
 /* Pick the portrait or landscape canvas from the window aspect and keep the
@@ -485,9 +489,20 @@ int main(int argc, char **argv)
 #if defined(__ANDROID__)
         /* The picker is done and the activity is gone: end the loop so the
          * process exits cleanly instead of leaving a zombie SDL thread. */
-        if (g_picker_seen && !storage_folder_pending() &&
-            !android_storage_activity_alive()) {
+        bool alive = android_storage_activity_alive();
+        uint64_t now_ticks = SDL_GetTicks();
+        if (g_picker_seen && !storage_folder_pending() && !alive) {
             running = false;
+        } else if (g_picker_seen && !alive) {
+            /* Picker still unresolved and the activity is gone: bail out if
+             * it stays that way, so the process does not linger. */
+            if (g_activity_gone_since == 0) {
+                g_activity_gone_since = now_ticks;
+            } else if (now_ticks - g_activity_gone_since > ACTIVITY_GONE_TIMEOUT_MS) {
+                running = false;
+            }
+        } else {
+            g_activity_gone_since = 0;
         }
         if (storage_folder_pending()) {
             g_picker_seen = true;
