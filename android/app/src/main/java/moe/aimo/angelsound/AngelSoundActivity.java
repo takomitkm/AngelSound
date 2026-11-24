@@ -28,7 +28,20 @@ public class AngelSoundActivity extends SDLActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.w(TAG, "DIAG onCreate this=" + hashCode() + " saved=" + (savedInstanceState != null));
         super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    protected void onDestroy() {
+        Log.w(TAG, "DIAG onDestroy finishing=" + isFinishing() + " this=" + hashCode());
+        super.onDestroy();
+    }
+
+    @Override
+    protected void onRestart() {
+        Log.w(TAG, "DIAG onRestart this=" + hashCode());
+        super.onRestart();
     }
 
     @Override
