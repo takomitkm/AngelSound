@@ -1,9 +1,5 @@
 #include "storage.h"
 
-#if defined(__ANDROID__)
-#include <android/log.h>
-#endif
-
 #include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -55,6 +51,24 @@ static bool path_is_dir(const char *path)
 {
     SDL_PathInfo info;
     return SDL_GetPathInfo(path, &info) && info.type == SDL_PATHTYPE_DIRECTORY;
+}
+
+/* Check that a plain directory really accepts writes.  Android's scoped
+ * storage makes Java's canWrite() report false for public folders that the
+ * native layer can still write, so probe with a real file instead. */
+static bool path_is_writable(const char *path)
+{
+    char probe[PATH_CAP];
+    if (storage_join(probe, sizeof(probe), path, ".angelsound-write-test") < 0) {
+        return false;
+    }
+    FILE *f = fopen(probe, "wb");
+    if (f == NULL) {
+        return false;
+    }
+    fclose(f);
+    remove(probe);
+    return true;
 }
 
 static void default_location(char *out, size_t cap)
@@ -114,6 +128,10 @@ static bool apply_location(const char *location, bool saf, char *err, size_t err
     }
     if (!saf && !SDL_CreateDirectory(location)) {
         set_err(err, errcap, "cannot create recordings folder");
+        return false;
+    }
+    if (!saf && !path_is_writable(location)) {
+        set_err(err, errcap, "recordings folder is not writable");
         return false;
     }
     snprintf(g_location, sizeof(g_location), "%s", location);
@@ -371,11 +389,7 @@ bool storage_choose_folder(void)
         return false;
     }
 #if defined(__ANDROID__)
-    __android_log_print(ANDROID_LOG_WARN, "AngelSound",
-                        "DIAG choose_folder pending=%d", g_folder_pending ? 1 : 0);
     if (!android_storage_pick_folder()) {
-        __android_log_print(ANDROID_LOG_WARN, "AngelSound",
-                            "DIAG choose_folder pick failed");
         return false;
     }
     g_folder_pending = true;
@@ -402,17 +416,13 @@ int storage_poll_folder(void)
         if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline) {
             char *fallback = android_storage_public_folder();
             g_folder_pending = false;
-            __android_log_print(ANDROID_LOG_WARN, "AngelSound",
-                                "DIAG fallback folder=%s",
-                                fallback ? fallback : "(null)");
             if (fallback == NULL || *fallback == '\0') {
                 free(fallback);
                 return -1;
             }
             bool ok = apply_location(fallback, false, NULL, 0);
             free(fallback);
-            return ok ? 1 : -1;
-        }
+            return ok ? 1 : -1;        }
         return 0;
     }
     if (*uri == '\0') {

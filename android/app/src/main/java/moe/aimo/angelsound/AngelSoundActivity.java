@@ -84,12 +84,10 @@ public class AngelSoundActivity extends SDLActivity {
         try {
             File music = Environment.getExternalStoragePublicDirectory(
                     Environment.DIRECTORY_MUSIC);
-            Log.w(TAG, "DIAG public music=" + music);
             File dir = new File(music, "AngelSound");
-            boolean made = dir.isDirectory() || dir.mkdirs();
-            Log.w(TAG, "DIAG public dir=" + dir + " made=" + made
-                    + " canWrite=" + dir.canWrite());
-            if (!made || !dir.canWrite()) {
+            /* canWrite() is false under scoped storage even when the app can
+             * really write there, so only the directory creation decides. */
+            if (!dir.isDirectory() && !dir.mkdirs()) {
                 return "";
             }
             return dir.getAbsolutePath();
