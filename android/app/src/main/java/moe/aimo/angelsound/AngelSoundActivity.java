@@ -34,7 +34,10 @@ public class AngelSoundActivity extends SDLActivity {
 
     @Override
     protected void onDestroy() {
-        Log.w(TAG, "DIAG onDestroy finishing=" + isFinishing() + " this=" + hashCode());
+        Log.w(TAG, "DIAG onDestroy finishing=" + isFinishing()
+                + " changingConfig=" + isChangingConfigurations()
+                + " taskIsRemoving=" + (getTask() == null || getTask().isFinishing())
+                + " this=" + hashCode());
         super.onDestroy();
     }
 
