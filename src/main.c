@@ -497,6 +497,7 @@ int main(int argc, char **argv)
         }
     }
 
+    SDL_Log("DIAG native main loop exiting");
     SDL_RemoveEventWatch(event_watch, &app);
     audio_shutdown(app.engine);
     if (app.ui != NULL) {
