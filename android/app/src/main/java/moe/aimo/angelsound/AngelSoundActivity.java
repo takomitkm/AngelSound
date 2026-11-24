@@ -1,7 +1,9 @@
 package moe.aimo.angelsound;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.content.UriPermission;
 import android.database.Cursor;
@@ -47,7 +49,9 @@ public class AngelSoundActivity extends SDLActivity {
         Log.w(TAG, "DIAG result req=" + requestCode + " code=" + resultCode
                 + " data=" + (data == null ? "null" : data.getData()));
         if (requestCode == REQ_PICK_FOLDER) {
-            if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
+            /* Some ROMs hand back RESULT_CANCELED together with a valid tree
+             * URI, so trust the payload instead of the result code. */
+            if (data != null && data.getData() != null) {
                 Uri uri = data.getData();
                 int flags = data.getFlags()
                         & (Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -61,6 +65,17 @@ public class AngelSoundActivity extends SDLActivity {
                 persistFolder(sPickedUri);
             } else {
                 sPickedUri = "";
+            }
+            /* The picker often leaves this task behind the launcher on ROMs
+             * that destroy the activity; bring it back to the foreground. */
+            try {
+                ActivityManager am =
+                        (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    am.moveTaskToFront(getTaskId(), 0);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "bring to front failed", e);
             }
             return;
         }
