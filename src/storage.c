@@ -427,13 +427,20 @@ int storage_poll_folder(void)
         if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline) {
             char *fallback = android_storage_public_folder();
             g_folder_pending = false;
+            __android_log_print(ANDROID_LOG_WARN, "AngelSound",
+                                "DIAG fallback path=%s writable=%d",
+                                fallback ? fallback : "(null)",
+                                fallback && path_is_writable(fallback) ? 1 : 0);
             if (fallback == NULL || *fallback == '\0') {
                 free(fallback);
                 return -1;
             }
             bool ok = apply_location(fallback, false, NULL, 0);
+            __android_log_print(ANDROID_LOG_WARN, "AngelSound",
+                                "DIAG fallback apply=%d", ok ? 1 : 0);
             free(fallback);
-            return ok ? 1 : -1;        }
+            return ok ? 1 : -1;
+        }
         return 0;
     }
     if (*uri == '\0') {
