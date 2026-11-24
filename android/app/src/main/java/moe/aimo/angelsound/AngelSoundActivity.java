@@ -33,16 +33,6 @@ public class AngelSoundActivity extends SDLActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        /* The app may have been restarted while the SAF picker was open.
-         * Mirror any persisted tree grant into settings.txt so the native
-         * storage layer picks it up on startup. */
-        File settings = new File(getFilesDir(), "settings.txt");
-        if (!settings.exists()) {
-            String uri = newestPersistedTree();
-            if (uri != null) {
-                persistFolder(uri);
-            }
-        }
     }
 
     @Override
@@ -94,6 +84,9 @@ public class AngelSoundActivity extends SDLActivity {
             Set<String> before = sGrantsBeforePick;
             value = newPersistedTree(before);
             if (value != null) {
+                /* Native poll found a fresh grant: mirror it so storage_init
+                 * in a restarted process reads the chosen folder. */
+                persistFolder(value);
                 sGrantsBeforePick = null;
             }
         }
@@ -127,11 +120,6 @@ public class AngelSoundActivity extends SDLActivity {
             Log.w(TAG, "new persisted tree scan failed", e);
         }
         return null;
-    }
-
-    private String newestPersistedTree() {
-        Set<String> uris = persistedTreeUris();
-        return uris.isEmpty() ? null : uris.iterator().next();
     }
 
     /* Mirror the chosen tree URI to the file the native storage layer reads. */

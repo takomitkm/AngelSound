@@ -373,9 +373,6 @@ bool storage_choose_folder(void)
 
 int storage_poll_folder(void)
 {
-    if (!g_folder_pending) {
-        return 0;
-    }
 #if defined(__ANDROID__)
     char *uri = android_storage_take_picked_uri();
     if (uri == NULL) {
@@ -386,12 +383,19 @@ int storage_poll_folder(void)
         g_folder_pending = false;
         return -1;
     }
+    /* On Android the picker may destroy/recreate the activity, losing the
+     * pending flag.  Accept a URI whenever the Java side found a fresh
+     * persisted grant, but skip it if it is already the current folder. */
+    if (!g_folder_pending && strcmp(g_location, uri) == 0) {
+        free(uri);
+        return 0;
+    }
     bool ok = apply_location(uri, true, NULL, 0);
     free(uri);
     g_folder_pending = false;
     return ok ? 1 : -1;
 #else
-    if (g_folder_result == 0) {
+    if (!g_folder_pending) {
         return 0;
     }
     int result = g_folder_result;
