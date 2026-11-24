@@ -124,6 +124,7 @@ char *android_storage_take_picked_uri(void)
     }
     JNIEnv *env = call.env;
     jstring value = (jstring)(*env)->CallObjectMethod(env, call.activity, g_take_uri);
+    SDL_Log("DIAG take_picked_uri value=%s", value ? "nonnull" : "null");
     char *copy = NULL;
     if (!check_exception(env, "getPickedUri") && value != NULL) {
         const char *chars = (*env)->GetStringUTFChars(env, value, NULL);
