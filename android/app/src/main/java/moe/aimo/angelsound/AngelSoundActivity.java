@@ -84,11 +84,12 @@ public class AngelSoundActivity extends SDLActivity {
         try {
             File music = Environment.getExternalStoragePublicDirectory(
                     Environment.DIRECTORY_MUSIC);
+            Log.w(TAG, "DIAG public music=" + music);
             File dir = new File(music, "AngelSound");
-            if (!dir.isDirectory() && !dir.mkdirs()) {
-                return "";
-            }
-            if (!dir.canWrite()) {
+            boolean made = dir.isDirectory() || dir.mkdirs();
+            Log.w(TAG, "DIAG public dir=" + dir + " made=" + made
+                    + " canWrite=" + dir.canWrite());
+            if (!made || !dir.canWrite()) {
                 return "";
             }
             return dir.getAbsolutePath();
