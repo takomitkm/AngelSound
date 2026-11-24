@@ -50,6 +50,7 @@ public class AngelSoundActivity extends SDLActivity {
                     Log.w(TAG, "persistable permission failed", e);
                 }
                 sPickedUri = uri.toString();
+                persistFolder(sPickedUri);
             } else {
                 sPickedUri = "";
             }
@@ -65,12 +66,9 @@ public class AngelSoundActivity extends SDLActivity {
                     | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             try {
-                /* Do not bind a result callback: on some ROMs bringing up the
-                 * SAF picker destroys the source Activity, so onActivityResult
-                 * never runs.  The persisted permission is polled instead. */
                 sPickedUri = null;
                 sGrantsBeforePick = persistedTreeUris();
-                startActivity(intent);
+                startActivityForResult(intent, REQ_PICK_FOLDER);
             } catch (ActivityNotFoundException e) {
                 Log.w(TAG, "no document tree picker", e);
                 sPickedUri = "";

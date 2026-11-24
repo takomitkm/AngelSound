@@ -126,7 +126,7 @@ static bool apply_location(const char *location, bool saf, char *err, size_t err
         set_err(err, errcap, "empty recordings folder");
         return false;
     }
-    if (!saf && !SDL_CreateDirectory(location)) {
+    if (!saf && !path_is_dir(location) && !SDL_CreateDirectory(location)) {
         set_err(err, errcap, "cannot create recordings folder");
         return false;
     }
