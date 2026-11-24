@@ -394,7 +394,8 @@ int storage_poll_folder(void)
         if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline) {
             char *fallback = android_storage_public_folder();
             g_folder_pending = false;
-            SDL_Log("DIAG fallback folder='%s'", fallback ? fallback : "(null)");
+            fprintf(stderr, "DIAG fallback folder='%s'\n",
+                    fallback ? fallback : "(null)");
             if (fallback == NULL || *fallback == '\0') {
                 free(fallback);
                 return -1;
