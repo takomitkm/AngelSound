@@ -12,6 +12,9 @@
 
 #define UI_LOGICAL_W 720
 #define UI_LOGICAL_H 460
+/* Portrait canvas: phones hold the app upright, so the list grows and the
+ * buttons move into a grid underneath it. */
+#define UI_PORTRAIT_H 1280
 #define UI_LAYOUT_CAP 12
 
 typedef enum {
@@ -64,6 +67,15 @@ UiRect ui_list_rect(void);
 float ui_row_height(void);
 int ui_visible_rows(void);
 void ui_clamp_selection(UiModel *m);
+/* Portrait switches the canvas height and moves the buttons under the list. */
+void ui_set_portrait(bool portrait);
+bool ui_is_portrait(void);
+float ui_canvas_h(void);
+/* Right-hand column used by the landscape layout; equal to the canvas width
+ * in portrait, where the stats block sits under the buttons. */
+float ui_right_x(void);
+float ui_right_w(void);
+float ui_stats_y(void);
 int ui_layout_buttons(const UiModel *m, UiButton *buttons, int cap);
 UiAction ui_hit_action(const UiModel *m, float x, float y, int *selected);
 int ui_clip_text(const char *text, char *out, size_t cap, int max_chars);

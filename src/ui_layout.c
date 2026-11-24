@@ -11,9 +11,51 @@
 #define RIGHT_X 432.0f
 #define RIGHT_W 272.0f
 
+/* Portrait: the list spans the screen and the buttons live underneath it. */
+#define PORTRAIT_LIST_W 688.0f
+#define PORTRAIT_LIST_H 560.0f
+#define PORTRAIT_BTN_Y 640.0f
+#define PORTRAIT_BTN_H 52.0f
+#define PORTRAIT_BIG_H 56.0f
+#define PORTRAIT_GAP 16.0f
+#define PORTRAIT_COL 332.0f
+
+static bool g_portrait;
+
+void ui_set_portrait(bool portrait)
+{
+    g_portrait = portrait;
+}
+
+bool ui_is_portrait(void)
+{
+    return g_portrait;
+}
+
+float ui_canvas_h(void)
+{
+    return g_portrait ? (float)UI_PORTRAIT_H : (float)UI_LOGICAL_H;
+}
+
+float ui_right_x(void)
+{
+    return g_portrait ? LIST_X : RIGHT_X;
+}
+
+float ui_right_w(void)
+{
+    return g_portrait ? PORTRAIT_LIST_W : RIGHT_W;
+}
+
+float ui_stats_y(void)
+{
+    return g_portrait ? 968.0f : 286.0f;
+}
+
 UiRect ui_list_rect(void)
 {
-    UiRect rect = { LIST_X, LIST_Y, LIST_W, LIST_H };
+    UiRect rect = { LIST_X, LIST_Y, g_portrait ? PORTRAIT_LIST_W : LIST_W,
+                    g_portrait ? PORTRAIT_LIST_H : LIST_H };
     return rect;
 }
 
@@ -24,7 +66,8 @@ float ui_row_height(void)
 
 int ui_visible_rows(void)
 {
-    return (int)(LIST_H / ROW_H);
+    UiRect lr = ui_list_rect();
+    return (int)(lr.h / ROW_H);
 }
 
 void ui_clamp_selection(UiModel *m)
@@ -77,6 +120,38 @@ int ui_layout_buttons(const UiModel *m, UiButton *buttons, int cap)
     int n = 0;
     bool has_sel = m->selected >= 0 && m->selected < m->file_count;
     AudioState st = m->audio_state;
+
+    if (g_portrait) {
+        float y = PORTRAIT_BTN_Y;
+        add_button(buttons, &n, LIST_X, y, PORTRAIT_COL, PORTRAIT_BIG_H, "Record",
+                   UI_ACTION_RECORD, st == AUDIO_STATE_IDLE, 1);
+        add_button(buttons, &n, LIST_X + PORTRAIT_COL + PORTRAIT_GAP, y, PORTRAIT_COL,
+                   PORTRAIT_BIG_H, "Stop", UI_ACTION_STOP,
+                   st == AUDIO_STATE_RECORDING, 2);
+        y += PORTRAIT_BIG_H + PORTRAIT_GAP;
+        add_button(buttons, &n, LIST_X, y, 210, PORTRAIT_BTN_H, "Play",
+                   UI_ACTION_PLAY, has_sel, 3);
+        add_button(buttons, &n, LIST_X + 210 + 12, y, 210, PORTRAIT_BTN_H, "Pause",
+                   UI_ACTION_PAUSE, st == AUDIO_STATE_PLAYING, 3);
+        add_button(buttons, &n, LIST_X + 434 + 10, y, 244, PORTRAIT_BTN_H, "Resume",
+                   UI_ACTION_RESUME, st == AUDIO_STATE_PAUSED, 3);
+        y += PORTRAIT_BTN_H + PORTRAIT_GAP;
+        add_button(buttons, &n, LIST_X, y, PORTRAIT_COL, PORTRAIT_BTN_H, "Browse",
+                   UI_ACTION_BROWSE, true, 0);
+        add_button(buttons, &n, LIST_X + PORTRAIT_COL + PORTRAIT_GAP, y, PORTRAIT_COL,
+                   PORTRAIT_BTN_H, "Delete", UI_ACTION_DELETE,
+                   has_sel && st != AUDIO_STATE_RECORDING, 0);
+        y += PORTRAIT_BTN_H + PORTRAIT_GAP;
+        add_button(buttons, &n, LIST_X, y, PORTRAIT_LIST_W, PORTRAIT_BTN_H,
+                   m->input_label, UI_ACTION_CYCLE_INPUT, true, 0);
+        y += PORTRAIT_BTN_H + PORTRAIT_GAP;
+        add_button(buttons, &n, LIST_X, y, PORTRAIT_COL, PORTRAIT_BTN_H, "Folder",
+                   UI_ACTION_CHOOSE_FOLDER, true, 0);
+        add_button(buttons, &n, LIST_X + PORTRAIT_COL + PORTRAIT_GAP, y, PORTRAIT_COL,
+                   PORTRAIT_BTN_H, "About", UI_ACTION_ABOUT, true, 0);
+        (void)cap;
+        return n;
+    }
 
     add_button(buttons, &n, RIGHT_X, 56, 128, 40, "Record", UI_ACTION_RECORD,
                st == AUDIO_STATE_IDLE, 1);

@@ -147,6 +147,35 @@ int main(void)
     CHECK(strcmp(buf, "...") == 0);
     CHECK(ui_clip_text(NULL, buf, sizeof(buf), 5) == 0);
 
+    /* Portrait: taller canvas, list on top, buttons in a grid underneath. */
+    int landscape_rows = ui_visible_rows();
+    UiRect landscape_list = ui_list_rect();
+    ui_set_portrait(true);
+    CHECK(ui_canvas_h() == (float)UI_PORTRAIT_H);
+    CHECK(ui_visible_rows() > landscape_rows);
+    UiRect portrait_list = ui_list_rect();
+    CHECK(portrait_list.w > landscape_list.w);
+    CHECK(portrait_list.y + portrait_list.h <= UI_PORTRAIT_H);
+
+    count = ui_layout_buttons(&m, buttons, UI_LAYOUT_CAP);
+    CHECK(count == 10);
+    for (int i = 0; i < count; i++) {
+        CHECK(buttons[i].rect.x >= 0);
+        CHECK(buttons[i].rect.y >= 0);
+        CHECK(buttons[i].rect.x + buttons[i].rect.w <= UI_LOGICAL_W);
+        CHECK(buttons[i].rect.y + buttons[i].rect.h <= UI_PORTRAIT_H);
+        CHECK(buttons[i].rect.y >= portrait_list.y + portrait_list.h);
+    }
+    for (int i = 0; i < count; i++) {
+        for (int j = i + 1; j < count; j++) {
+            CHECK(!rect_overlaps(buttons[i].rect, buttons[j].rect));
+        }
+    }
+    CHECK(ui_hit_action(&m, buttons[0].rect.x + 5, buttons[0].rect.y + 5, NULL) ==
+          buttons[0].action);
+    ui_set_portrait(false);
+    CHECK(ui_canvas_h() == (float)UI_LOGICAL_H);
+
     if (failures == 0) {
         printf("test_ui_layout: PASS\n");
         return 0;

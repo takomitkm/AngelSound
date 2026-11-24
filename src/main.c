@@ -329,6 +329,28 @@ static bool event_watch(void *userdata, SDL_Event *e)
     return true;
 }
 
+static bool g_presentation_set;
+
+/* Pick the portrait or landscape canvas from the window aspect and keep the
+ * logical presentation in sync.  Cheap enough to call every frame. */
+static void apply_ui_mode(SDL_Window *window, SDL_Renderer *renderer)
+{
+    if (window == NULL || renderer == NULL) {
+        return;
+    }
+    int w = 0;
+    int h = 0;
+    SDL_GetWindowSize(window, &w, &h);
+    bool portrait = h > w;
+    if (g_presentation_set && portrait == ui_is_portrait()) {
+        return;
+    }
+    ui_set_portrait(portrait);
+    SDL_SetRenderLogicalPresentation(renderer, UI_LOGICAL_W, (int)ui_canvas_h(),
+                                     SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    g_presentation_set = true;
+}
+
 int main(int argc, char **argv)
 {
     bool smoke = false;
@@ -359,8 +381,24 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    #if defined(__ANDROID__)
+    /* Phone screens are portrait; ask for the real display size instead of a
+     * fixed landscape window, then adapt the layout to the actual aspect. */
+    int win_w = 720;
+    int win_h = 1280;
+    SDL_DisplayID display = SDL_GetPrimaryDisplay();
+    const SDL_DisplayMode *mode =
+        display != 0 ? SDL_GetCurrentDisplayMode(display) : NULL;
+    if (mode != NULL) {
+        win_w = mode->w;
+        win_h = mode->h;
+    }
+#else
+    int win_w = 1080;
+    int win_h = 690;
+#endif
     app.window = SDL_CreateWindow("AngelSound - pseudo-voice practice recorder",
-                                  1080, 690,
+                                  win_w, win_h,
                                   SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (app.window == NULL && !smoke) {
         fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
@@ -369,8 +407,8 @@ int main(int argc, char **argv)
     app.renderer =
         app.window != NULL ? SDL_CreateRenderer(app.window, NULL) : NULL;
     if (app.renderer != NULL) {
-        SDL_SetRenderLogicalPresentation(app.renderer, UI_LOGICAL_W, UI_LOGICAL_H,
-                                         SDL_LOGICAL_PRESENTATION_LETTERBOX);
+        SDL_SetRenderVSync(app.renderer, 1);
+        apply_ui_mode(app.window, app.renderer);
     } else if (!smoke) {
         fprintf(stderr, "SDL_CreateRenderer: %s\n", SDL_GetError());
         return 1;
@@ -418,15 +456,8 @@ int main(int argc, char **argv)
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
-#if defined(__ANDROID__)
-                /* SDLActivity sends QUIT when the Activity is pushed to the
-                 * background (e.g. by the SAF picker).  Keep the native loop
-                 * alive so getPickedUri() can poll the persisted permission. */
-                continue;
-#else
                 running = false;
                 continue;
-#endif
             }
             UiAction action = app.ui != NULL ? ui_handle_event(app.ui, &e, &app.model)
                                              : UI_ACTION_NONE;
@@ -492,6 +523,7 @@ int main(int argc, char **argv)
             practice_current_ms(&app.practice, now) >= PRACTICE_WARN_MS;
 
         if (app.ui != NULL && app.renderer != NULL) {
+            apply_ui_mode(app.window, app.renderer);
             ui_render(app.ui, &app.model);
         }
 

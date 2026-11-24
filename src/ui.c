@@ -6,8 +6,6 @@
 
 #include "practice.h"
 
-static const SDL_FRect g_bg_rect = { 0, 0, UI_LOGICAL_W, UI_LOGICAL_H };
-
 struct Ui {
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -260,7 +258,14 @@ void ui_render(Ui *ui, UiModel *m)
     SDL_Renderer *r = ui->renderer;
     ui_clamp_selection(m);
 
-    fill_rect(r, g_bg_rect, 24, 26, 32, 255);
+    /* Clear the whole target first: the letterbox bands around the logical
+     * canvas would otherwise keep stale pixels from the previous frame,
+     * which shows up as tearing / ghosting on Android. */
+    SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
+    SDL_RenderClear(r);
+
+    SDL_FRect bg = { 0, 0, (float)UI_LOGICAL_W, ui_canvas_h() };
+    fill_rect(r, bg, 24, 26, 32, 255);
 
     draw_text(r, 16, 14, "AngelSound", 96, 165, 250);
     draw_text(r, 16 + 11 * 8 + 8, 14, "- pseudo-voice practice recorder", 150, 156,
@@ -294,25 +299,28 @@ void ui_render(Ui *ui, UiModel *m)
     practice_format_time(m->last_take_ms, last, sizeof(last));
     snprintf(line, sizeof(line), "Take %d · Session %s · Last %s", m->takes, session,
              last);
-    draw_text(r, 432, 286, line, 190, 196, 210);
-    draw_text(r, 432, 302, "Keys: R record · S stop · Space play", 120, 128, 144);
-    draw_text(r, 432, 316, "Up/Down select · Del delete · B browse", 120, 128, 144);
+    float rx = ui_right_x();
+    float sy = ui_stats_y();
+    draw_text(r, rx, sy, line, 190, 196, 210);
+    draw_text(r, rx, sy + 16, "Keys: R record · S stop · Space play", 120, 128, 144);
+    draw_text(r, rx, sy + 30, "Up/Down select · Del delete · B browse", 120, 128, 144);
 
     if (m->practice_warn) {
-        SDL_FRect warn = { 432, 340, 272, 44 };
+        SDL_FRect warn = { rx, sy + 54, ui_right_w(), 44 };
         fill_rect(r, warn, 150, 96, 24, 255);
         stroke_rect(r, warn, 200, 140, 40);
-        draw_text(r, 440, 350, "Practiced 5+ min.", 250, 226, 180);
-        draw_text(r, 440, 364, "Take a break - your voice needs rest.", 250, 226, 180);
+        draw_text(r, rx + 8, sy + 62, "Practiced 5+ min.", 250, 226, 180);
+        draw_text(r, rx + 8, sy + 76, "Take a break - your voice needs rest.", 250,
+                  226, 180);
     }
 
     Uint64 now = SDL_GetTicks();
     if (ui->status[0] != '\0' && now < ui->status_until) {
-        draw_text(r, 16, UI_LOGICAL_H - 22, ui->status,
+        draw_text(r, 16, ui_canvas_h() - 22, ui->status,
                   ui->status_is_error ? 240 : 190, ui->status_is_error ? 120 : 196,
                   ui->status_is_error ? 120 : 250);
     }
-    draw_text(r, UI_LOGICAL_W - 120, UI_LOGICAL_H - 22, "C + SDL3", 110, 116, 132);
+    draw_text(r, UI_LOGICAL_W - 120, ui_canvas_h() - 22, "C + SDL3", 110, 116, 132);
 
     SDL_RenderPresent(r);
 }

@@ -8,8 +8,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Looper;
-import android.os.Handler;
 import android.provider.DocumentsContract;
 import android.util.Log;
 
@@ -64,19 +62,8 @@ public class AngelSoundActivity extends SDLActivity {
             } else {
                 sPickedUri = "";
             }
-            /* This ROM destroys the activity right after handing back the
-             * result, so relaunch ourselves once the destroy has settled.
-             * The chosen folder is already in settings.txt, so the fresh
-             * instance comes up on the new folder. */
-            final Intent relaunch = new Intent(this, AngelSoundActivity.class);
-            relaunch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                try {
-                    startActivity(relaunch);
-                } catch (Exception e) {
-                    Log.w(TAG, "relaunch failed", e);
-                }
-            }, 600);
+            /* The folder is already persisted; this ROM removes our task while
+             * the picker is up, so the user reopens the app from the launcher. */
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
