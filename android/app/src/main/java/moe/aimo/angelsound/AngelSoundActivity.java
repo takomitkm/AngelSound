@@ -60,7 +60,7 @@ public class AngelSoundActivity extends SDLActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        Log.d(TAG, "DIAG onActivityResult req=" + requestCode + " result=" + resultCode
+        Log.w(TAG, "DIAG onActivityResult req=" + requestCode + " result=" + resultCode
                 + " data=" + (data == null ? "null" : data.getData()));
         if (requestCode == REQ_PICK_FOLDER) {
             if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
@@ -74,10 +74,10 @@ public class AngelSoundActivity extends SDLActivity {
                     Log.w(TAG, "persistable permission failed", e);
                 }
                 sPickedUri = uri.toString();
-                Log.d(TAG, "DIAG picked uri=" + sPickedUri + " flags=" + flags);
+                Log.w(TAG, "DIAG picked uri=" + sPickedUri + " flags=" + flags);
             } else {
                 sPickedUri = "";
-                Log.d(TAG, "DIAG folder result not OK -> empty uri");
+                Log.w(TAG, "DIAG folder result not OK -> empty uri");
             }
             return;
         }
