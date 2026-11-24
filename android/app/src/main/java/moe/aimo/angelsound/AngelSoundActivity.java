@@ -7,6 +7,7 @@ import android.content.UriPermission;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.util.Log;
 
@@ -75,6 +76,26 @@ public class AngelSoundActivity extends SDLActivity {
                 sPickedUri = "";
             }
         });
+    }
+
+    /* Public fallback folder used when the SAF picker cannot deliver a result.
+     * The app holds the sdcard_rw group, so a plain path works here. */
+    public String getPublicFolder() {
+        try {
+            File music = Environment.getExternalStoragePublicDirectory(
+                    Environment.DIRECTORY_MUSIC);
+            File dir = new File(music, "AngelSound");
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                return "";
+            }
+            if (!dir.canWrite()) {
+                return "";
+            }
+            return dir.getAbsolutePath();
+        } catch (Exception e) {
+            Log.w(TAG, "public folder lookup failed", e);
+            return "";
+        }
     }
 
     public String getPickedUri() {

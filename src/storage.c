@@ -1,6 +1,7 @@
 #include "storage.h"
 
 #include <SDL3/SDL.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,6 +23,13 @@ static bool g_saf;
 static bool g_folder_pending;
 static int g_folder_result; /* 0 none, 1 picked, -1 canceled/failed */
 static char g_folder_value[PATH_CAP];
+#if defined(__ANDROID__)
+/* Grace period before the SAF picker result is considered lost.  Some ROMs
+ * destroy the activity that launched the picker, so the result never
+ * arrives; after this delay we fall back to the public folder. */
+static uint64_t g_folder_deadline;
+#define FOLDER_PICK_GRACE_MS 4000
+#endif
 
 static void set_err(char *err, size_t cap, const char *text)
 {
@@ -119,6 +127,9 @@ bool storage_init(char *err, size_t errcap)
     g_saf = false;
     g_folder_pending = false;
     g_folder_result = 0;
+#if defined(__ANDROID__)
+    g_folder_deadline = 0;
+#endif
 
     char *pref = SDL_GetPrefPath("Aimo", "AngelSound");
     if (pref != NULL) {
@@ -361,6 +372,7 @@ bool storage_choose_folder(void)
     }
     g_folder_pending = true;
     g_folder_result = 0;
+    g_folder_deadline = SDL_GetTicks() + FOLDER_PICK_GRACE_MS;
     return true;
 #else
     g_folder_result = 0;
@@ -376,6 +388,20 @@ int storage_poll_folder(void)
 #if defined(__ANDROID__)
     char *uri = android_storage_take_picked_uri();
     if (uri == NULL) {
+        /* No SAF result yet.  If the picker has been open long enough, the
+         * result is never going to arrive (the activity was destroyed), so
+         * fall back to the public recordings folder. */
+        if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline) {
+            char *fallback = android_storage_public_folder();
+            g_folder_pending = false;
+            if (fallback == NULL || *fallback == '\0') {
+                free(fallback);
+                return -1;
+            }
+            bool ok = apply_location(fallback, false, NULL, 0);
+            free(fallback);
+            return ok ? 1 : -1;
+        }
         return 0;
     }
     if (*uri == '\0') {

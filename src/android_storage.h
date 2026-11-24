@@ -10,6 +10,8 @@
 bool android_storage_pick_folder(void);
 /* NULL = no answer yet, "" = canceled, otherwise a malloc'd tree URI. */
 char *android_storage_take_picked_uri(void);
+/* Public fallback folder path, or NULL/"" when it is not usable. */
+char *android_storage_public_folder(void);
 bool android_storage_list(const char *uri, char ***names, int *count);
 bool android_storage_exists(const char *uri, const char *name);
 bool android_storage_read_to_cache(const char *uri, const char *name, const char *dest);

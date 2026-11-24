@@ -10,6 +10,7 @@
 static jclass g_cls;
 static jmethodID g_pick;
 static jmethodID g_take_uri;
+static jmethodID g_public_folder;
 static jmethodID g_list;
 static jmethodID g_exists;
 static jmethodID g_read;
@@ -46,6 +47,8 @@ static bool jni_ready(JNIEnv *env, jobject activity, JniCall *call)
         g_pick = (*env)->GetMethodID(env, g_cls, "pickFolder", "()V");
         g_take_uri = (*env)->GetMethodID(env, g_cls, "getPickedUri",
                                          "()Ljava/lang/String;");
+        g_public_folder = (*env)->GetMethodID(env, g_cls, "getPublicFolder",
+                                              "()Ljava/lang/String;");
         g_list = (*env)->GetMethodID(env, g_cls, "listWavs",
                                      "(Ljava/lang/String;)[Ljava/lang/String;");
         g_exists = (*env)->GetMethodID(env, g_cls, "exists",
@@ -123,6 +126,32 @@ char *android_storage_take_picked_uri(void)
     jstring value = (jstring)(*env)->CallObjectMethod(env, call.activity, g_take_uri);
     char *copy = NULL;
     if (!check_exception(env, "getPickedUri") && value != NULL) {
+        const char *chars = (*env)->GetStringUTFChars(env, value, NULL);
+        if (chars != NULL) {
+            size_t len = strlen(chars);
+            copy = malloc(len + 1);
+            if (copy != NULL) {
+                memcpy(copy, chars, len + 1);
+            }
+            (*env)->ReleaseStringUTFChars(env, value, chars);
+        }
+        (*env)->DeleteLocalRef(env, value);
+    }
+    jni_end(&call);
+    return copy;
+}
+
+char *android_storage_public_folder(void)
+{
+    JniCall call;
+    if (!jni_begin(&call)) {
+        return NULL;
+    }
+    JNIEnv *env = call.env;
+    jstring value =
+        (jstring)(*env)->CallObjectMethod(env, call.activity, g_public_folder);
+    char *copy = NULL;
+    if (!check_exception(env, "getPublicFolder") && value != NULL) {
         const char *chars = (*env)->GetStringUTFChars(env, value, NULL);
         if (chars != NULL) {
             size_t len = strlen(chars);
