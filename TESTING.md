@@ -63,8 +63,9 @@ EXCLUDED (with reason):
 
 - L0 (per edit, local): `py S:\apps\check\check_c.py <project>` (clangd+clice)
   then build & `ctest` on the school Windows host (gcc + MSVC where available).
-- L2 (per push): GitHub Actions build-test (Windows/macOS/Ubuntu) + android
-  assembleDebug.
+- L2 (on demand): GitHub Actions build-test (Windows/macOS/Ubuntu) + android
+  assembleDebug. The workflow is `workflow_dispatch` only — run it from the
+  Actions tab or `gh workflow run ci.yml`; pushes and PRs trigger nothing.
 - L6: regression tests for FM-3 and FM-6 are permanent members of L0.
 
 ## Red/green evidence

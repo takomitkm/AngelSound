@@ -1,8 +1,9 @@
 name: CI
 
+# Manual only: every build starts from the Actions tab (or `gh workflow run`).
+# Pushes and pull requests do not trigger anything, so a WIP branch costs
+# nothing and macOS runner capacity is never queued for us.
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 concurrency:
