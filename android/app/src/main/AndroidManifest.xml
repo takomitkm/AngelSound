@@ -29,11 +29,18 @@
         android:enableOnBackInvokedCallback="false"
         android:hardwareAccelerated="true">
 
+        <!-- The SAF picker may destroy and recreate this activity.  Tell SDL
+             to allow the recreation instead of calling exit(), so the picked
+             folder is not lost with the process. -->
+        <meta-data
+            android:name="SDL_ENV.SDL_ANDROID_ALLOW_RECREATE_ACTIVITY"
+            android:value="1" />
+
         <activity
             android:name=".AngelSoundActivity"
             android:label="@string/app_name"
             android:alwaysRetainTaskState="true"
-            android:launchMode="singleInstance"
+            android:launchMode="singleTop"
             android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:preferMinimalPostProcessing="true"
             android:exported="true">
