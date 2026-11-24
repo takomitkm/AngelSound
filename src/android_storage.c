@@ -12,6 +12,7 @@ static jclass g_cls;
 static jmethodID g_pick;
 static jmethodID g_take_uri;
 static jmethodID g_public_folder;
+static jmethodID g_alive;
 static jmethodID g_list;
 static jmethodID g_exists;
 static jmethodID g_read;
@@ -50,6 +51,7 @@ static bool jni_ready(JNIEnv *env, jobject activity, JniCall *call)
                                          "()Ljava/lang/String;");
         g_public_folder = (*env)->GetMethodID(env, g_cls, "getPublicFolder",
                                               "()Ljava/lang/String;");
+        g_alive = (*env)->GetMethodID(env, g_cls, "isActivityAlive", "()Z");
         g_list = (*env)->GetMethodID(env, g_cls, "listWavs",
                                      "(Ljava/lang/String;)[Ljava/lang/String;");
         g_exists = (*env)->GetMethodID(env, g_cls, "exists",
@@ -142,6 +144,19 @@ char *android_storage_take_picked_uri(void)
     return copy;
 }
 
+
+bool android_storage_activity_alive(void)
+{
+    JniCall call;
+    if (!jni_begin(&call)) {
+        return false;
+    }
+    jboolean alive =
+        (*call.env)->CallBooleanMethod(call.env, call.activity, g_alive);
+    bool ok = !check_exception(call.env, "isActivityAlive") && alive == JNI_TRUE;
+    jni_end(&call);
+    return ok;
+}
 
 char *android_storage_public_folder(void)
 {

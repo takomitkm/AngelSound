@@ -10,6 +10,8 @@
 bool android_storage_pick_folder(void);
 /* NULL = no answer yet, "" = canceled, otherwise a malloc'd tree URI. */
 char *android_storage_take_picked_uri(void);
+/* Whether the SDL activity still exists (not finishing/destroyed). */
+bool android_storage_activity_alive(void);
 /* Public fallback folder path, or NULL/"" when it is not usable. */
 char *android_storage_public_folder(void);
 bool android_storage_list(const char *uri, char ***names, int *count);

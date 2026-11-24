@@ -330,6 +330,11 @@ static bool event_watch(void *userdata, SDL_Event *e)
 }
 
 static bool g_presentation_set;
+#if defined(__ANDROID__)
+/* Set once a folder pick has been observed, so the loop can end after the
+ * picker result lands and the activity is gone. */
+static bool g_picker_seen;
+#endif
 
 /* Pick the portrait or landscape canvas from the window aspect and keep the
  * logical presentation in sync.  Cheap enough to call every frame. */
@@ -456,6 +461,14 @@ int main(int argc, char **argv)
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
+#if defined(__ANDROID__)
+                /* The ROM tears down the activity while the SAF picker is on
+                 * top, which sends QUIT.  Stay alive so the picker result can
+                 * still reach us, then exit once the pick has resolved. */
+                if (storage_folder_pending()) {
+                    continue;
+                }
+#endif
                 running = false;
                 continue;
             }
@@ -469,6 +482,17 @@ int main(int argc, char **argv)
         }
 
         int folder = storage_poll_folder();
+#if defined(__ANDROID__)
+        /* The picker is done and the activity is gone: end the loop so the
+         * process exits cleanly instead of leaving a zombie SDL thread. */
+        if (g_picker_seen && !storage_folder_pending() &&
+            !android_storage_activity_alive()) {
+            running = false;
+        }
+        if (storage_folder_pending()) {
+            g_picker_seen = true;
+        }
+#endif
         if (folder == 1) {
             refresh_files(&app);
             app.model.selected = app.list.count > 0 ? 0 : -1;

@@ -28,7 +28,7 @@ static char g_folder_value[PATH_CAP];
  * destroy the activity that launched the picker, so the result never
  * arrives; after this delay we fall back to the public folder. */
 static uint64_t g_folder_deadline;
-#define FOLDER_PICK_GRACE_MS 4000
+#define FOLDER_PICK_GRACE_MS 30000
 #endif
 
 static void set_err(char *err, size_t cap, const char *text)
@@ -405,6 +405,11 @@ bool storage_choose_folder(void)
 #endif
 }
 
+bool storage_folder_pending(void)
+{
+    return g_folder_pending;
+}
+
 int storage_poll_folder(void)
 {
 #if defined(__ANDROID__)
@@ -413,7 +418,10 @@ int storage_poll_folder(void)
         /* No SAF result yet.  If the picker has been open long enough, the
          * result is never going to arrive (the activity was destroyed), so
          * fall back to the public recordings folder. */
-        if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline) {
+        /* Only fall back once the picker is gone (the activity is alive
+         * again) and the user had time to choose something. */
+        if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline &&
+            android_storage_activity_alive()) {
             char *fallback = android_storage_public_folder();
             g_folder_pending = false;
             if (fallback == NULL || *fallback == '\0') {

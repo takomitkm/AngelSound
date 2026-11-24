@@ -89,6 +89,11 @@ public class AngelSoundActivity extends SDLActivity {
     /* Public fallback folder used when the SAF picker cannot deliver a result.
      * The app holds the sdcard_rw group, so a plain path works here. */
 
+    /* Native side polls this to decide when the picker round trip is over. */
+    public boolean isActivityAlive() {
+        return !isFinishing() && !isDestroyed();
+    }
+
     public String getPublicFolder() {
         try {
             File music = Environment.getExternalStoragePublicDirectory(
