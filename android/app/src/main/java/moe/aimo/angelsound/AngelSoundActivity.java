@@ -45,6 +45,18 @@ public class AngelSoundActivity extends SDLActivity {
     }
 
     @Override
+    protected void onPause() {
+        Log.w(TAG, "DIAG onPause finishing=" + isFinishing() + " this=" + hashCode());
+        super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        Log.w(TAG, "DIAG onStop finishing=" + isFinishing() + " this=" + hashCode());
+        super.onStop();
+    }
+
+    @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         Log.d(TAG, "DIAG onActivityResult req=" + requestCode + " result=" + resultCode
                 + " data=" + (data == null ? "null" : data.getData()));
