@@ -85,13 +85,16 @@ public class AngelSoundActivity extends SDLActivity {
     }
 
     public void pickFolder() {
+        Log.w(TAG, "DIAG pickFolder called finishing=" + isFinishing());
         runOnUiThread(() -> {
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
                     | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             try {
+                Log.w(TAG, "DIAG before startActivityForResult finishing=" + isFinishing());
                 startActivityForResult(intent, REQ_PICK_FOLDER);
+                Log.w(TAG, "DIAG after startActivityForResult");
             } catch (ActivityNotFoundException e) {
                 Log.w(TAG, "no document tree picker", e);
                 sPickedUri = "";
