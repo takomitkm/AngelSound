@@ -371,7 +371,11 @@ bool storage_choose_folder(void)
         return false;
     }
 #if defined(__ANDROID__)
+    __android_log_print(ANDROID_LOG_WARN, "AngelSound",
+                        "DIAG choose_folder pending=%d", g_folder_pending ? 1 : 0);
     if (!android_storage_pick_folder()) {
+        __android_log_print(ANDROID_LOG_WARN, "AngelSound",
+                            "DIAG choose_folder pick failed");
         return false;
     }
     g_folder_pending = true;
