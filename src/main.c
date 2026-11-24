@@ -343,6 +343,12 @@ int main(int argc, char **argv)
         }
     }
 
+#if defined(__ANDROID__)
+    /* When a SAF picker (or any other app) covers the activity, Android may
+     * recreate it.  Let SDL keep the Java/C static state across recreation so
+     * the picked URI survives and the picker result is not lost to exit(). */
+    SDL_SetHint(SDL_HINT_ANDROID_ALLOW_RECREATE_ACTIVITY, "1");
+#endif
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "1");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
         fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
