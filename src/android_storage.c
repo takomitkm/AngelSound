@@ -4,7 +4,6 @@
 
 #include <SDL3/SDL.h>
 #include <jni.h>
-#include <android/log.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +12,7 @@ static jclass g_cls;
 static jmethodID g_pick;
 static jmethodID g_take_uri;
 static jmethodID g_public_folder;
+static jmethodID g_did_pick;
 static jmethodID g_list;
 static jmethodID g_exists;
 static jmethodID g_read;
@@ -51,6 +51,7 @@ static bool jni_ready(JNIEnv *env, jobject activity, JniCall *call)
                                          "()Ljava/lang/String;");
         g_public_folder = (*env)->GetMethodID(env, g_cls, "getPublicFolder",
                                               "()Ljava/lang/String;");
+        g_did_pick = (*env)->GetMethodID(env, g_cls, "didPickFolder", "()Z");
         g_list = (*env)->GetMethodID(env, g_cls, "listWavs",
                                      "(Ljava/lang/String;)[Ljava/lang/String;");
         g_exists = (*env)->GetMethodID(env, g_cls, "exists",
@@ -126,9 +127,6 @@ char *android_storage_take_picked_uri(void)
     }
     JNIEnv *env = call.env;
     jstring value = (jstring)(*env)->CallObjectMethod(env, call.activity, g_take_uri);
-    __android_log_print(ANDROID_LOG_WARN, "AngelSound",
-                        "DIAG take_picked_uri value=%s",
-                        value ? "nonnull" : "null");
     char *copy = NULL;
     if (!check_exception(env, "getPickedUri") && value != NULL) {
         const char *chars = (*env)->GetStringUTFChars(env, value, NULL);
@@ -144,6 +142,18 @@ char *android_storage_take_picked_uri(void)
     }
     jni_end(&call);
     return copy;
+}
+
+bool android_storage_did_pick(void)
+{
+    JniCall call;
+    if (!jni_begin(&call)) {
+        return false;
+    }
+    jboolean picked = (*call.env)->CallBooleanMethod(call.env, call.activity, g_did_pick);
+    bool ok = !check_exception(call.env, "didPickFolder") && picked == JNI_TRUE;
+    jni_end(&call);
+    return ok;
 }
 
 char *android_storage_public_folder(void)

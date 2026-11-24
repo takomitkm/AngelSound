@@ -413,7 +413,8 @@ int storage_poll_folder(void)
         /* No SAF result yet.  If the picker has been open long enough, the
          * result is never going to arrive (the activity was destroyed), so
          * fall back to the public recordings folder. */
-        if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline) {
+        if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline
+            && !android_storage_did_pick()) {
             char *fallback = android_storage_public_folder();
             g_folder_pending = false;
             if (fallback == NULL || *fallback == '\0') {

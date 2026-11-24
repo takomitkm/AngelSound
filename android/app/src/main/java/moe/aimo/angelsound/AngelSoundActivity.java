@@ -30,6 +30,7 @@ public class AngelSoundActivity extends SDLActivity {
 
     private static volatile String sPickedUri;
     private static volatile Set<String> sGrantsBeforePick;
+    private static volatile boolean sPickedForRequest;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +57,7 @@ public class AngelSoundActivity extends SDLActivity {
                     Log.w(TAG, "persistable permission failed", e);
                 }
                 sPickedUri = uri.toString();
+                sPickedForRequest = true;
                 persistFolder(sPickedUri);
             } else {
                 sPickedUri = "";
@@ -73,6 +75,7 @@ public class AngelSoundActivity extends SDLActivity {
                     | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             try {
                 sPickedUri = null;
+                sPickedForRequest = false;
                 sGrantsBeforePick = persistedTreeUris();
                 startActivityForResult(intent, REQ_PICK_FOLDER);
             } catch (ActivityNotFoundException e) {
@@ -84,6 +87,10 @@ public class AngelSoundActivity extends SDLActivity {
 
     /* Public fallback folder used when the SAF picker cannot deliver a result.
      * The app holds the sdcard_rw group, so a plain path works here. */
+    public boolean didPickFolder() {
+        return sPickedForRequest;
+    }
+
     public String getPublicFolder() {
         try {
             File music = Environment.getExternalStoragePublicDirectory(
@@ -109,9 +116,11 @@ public class AngelSoundActivity extends SDLActivity {
             value = newPersistedTree(before);
             if (value != null) {
                 /* Native poll found a fresh grant: mirror it so storage_init
-                 * in a restarted process reads the chosen folder. */
+                 * in a restarted process reads the chosen folder, then move
+                 * the baseline forward so it is only reported once. */
                 persistFolder(value);
-                sGrantsBeforePick = null;
+                sPickedForRequest = true;
+                sGrantsBeforePick = persistedTreeUris();
             }
         }
         return value;
