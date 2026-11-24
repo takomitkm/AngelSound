@@ -1,9 +1,5 @@
 #include "storage.h"
 
-#if defined(__ANDROID__)
-#include <android/log.h>
-#endif
-
 #include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -413,13 +409,6 @@ int storage_poll_folder(void)
 {
 #if defined(__ANDROID__)
     char *uri = android_storage_take_picked_uri();
-    if (g_folder_pending || (uri != NULL && uri[0] != '\0')) {
-        __android_log_print(ANDROID_LOG_WARN, "AngelSound",
-                            "DIAG poll uri=%s pending=%d since_deadline=%d",
-                            uri ? (uri[0] ? uri : "(empty)") : "(null)",
-                            g_folder_pending ? 1 : 0,
-                            (int)((long)SDL_GetTicks() - (long)g_folder_deadline));
-    }
     if (uri == NULL) {
         /* No SAF result yet.  If the picker has been open long enough, the
          * result is never going to arrive (the activity was destroyed), so
@@ -427,17 +416,11 @@ int storage_poll_folder(void)
         if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline) {
             char *fallback = android_storage_public_folder();
             g_folder_pending = false;
-            __android_log_print(ANDROID_LOG_WARN, "AngelSound",
-                                "DIAG fallback path=%s writable=%d",
-                                fallback ? fallback : "(null)",
-                                fallback && path_is_writable(fallback) ? 1 : 0);
             if (fallback == NULL || *fallback == '\0') {
                 free(fallback);
                 return -1;
             }
             bool ok = apply_location(fallback, false, NULL, 0);
-            __android_log_print(ANDROID_LOG_WARN, "AngelSound",
-                                "DIAG fallback apply=%d", ok ? 1 : 0);
             free(fallback);
             return ok ? 1 : -1;
         }

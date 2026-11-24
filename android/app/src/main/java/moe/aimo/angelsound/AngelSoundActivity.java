@@ -34,6 +34,12 @@ public class AngelSoundActivity extends SDLActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        /* Treat grants that survive process/activity recreation as the
+         * baseline.  Only grants added by a picker opened in this process
+         * should be reported as a fresh folder choice. */
+        if (sGrantsBeforePick == null) {
+            sGrantsBeforePick = persistedTreeUris();
+        }
     }
 
     @Override
