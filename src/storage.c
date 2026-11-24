@@ -1,5 +1,9 @@
 #include "storage.h"
 
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
+
 #include <SDL3/SDL.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -394,8 +398,9 @@ int storage_poll_folder(void)
         if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline) {
             char *fallback = android_storage_public_folder();
             g_folder_pending = false;
-            fprintf(stderr, "DIAG fallback folder='%s'\n",
-                    fallback ? fallback : "(null)");
+            __android_log_print(ANDROID_LOG_WARN, "AngelSound",
+                                "DIAG fallback folder=%s",
+                                fallback ? fallback : "(null)");
             if (fallback == NULL || *fallback == '\0') {
                 free(fallback);
                 return -1;

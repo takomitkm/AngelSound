@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL.h>
 #include <jni.h>
+#include <android/log.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -125,8 +126,9 @@ char *android_storage_take_picked_uri(void)
     }
     JNIEnv *env = call.env;
     jstring value = (jstring)(*env)->CallObjectMethod(env, call.activity, g_take_uri);
-    fprintf(stderr, "DIAG take_picked_uri value=%s\n",
-            value ? "nonnull" : "null");
+    __android_log_print(ANDROID_LOG_WARN, "AngelSound",
+                        "DIAG take_picked_uri value=%s",
+                        value ? "nonnull" : "null");
     char *copy = NULL;
     if (!check_exception(env, "getPickedUri") && value != NULL) {
         const char *chars = (*env)->GetStringUTFChars(env, value, NULL);
