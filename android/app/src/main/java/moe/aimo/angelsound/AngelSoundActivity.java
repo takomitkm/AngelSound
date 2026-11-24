@@ -3,6 +3,7 @@ package moe.aimo.angelsound;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.UriPermission;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -15,6 +16,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashSet;
+import java.util.Set;
 
 /* SDLActivity entry point plus a thin SAF bridge.  The native side calls the
  * static-looking instance methods below through JNI; all ContentResolver work
@@ -25,6 +28,7 @@ public class AngelSoundActivity extends SDLActivity {
     private static final int REQ_PICK_FOLDER = 0x4153;
 
     private static volatile String sPickedUri;
+    private static volatile Set<String> sGrantsBeforePick;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,7 +64,12 @@ public class AngelSoundActivity extends SDLActivity {
                     | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                     | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             try {
-                startActivityForResult(intent, REQ_PICK_FOLDER);
+                /* Do not bind a result callback: on some ROMs bringing up the
+                 * SAF picker destroys the source Activity, so onActivityResult
+                 * never runs.  The persisted permission is polled instead. */
+                sPickedUri = null;
+                sGrantsBeforePick = persistedTreeUris();
+                startActivity(intent);
             } catch (ActivityNotFoundException e) {
                 Log.w(TAG, "no document tree picker", e);
                 sPickedUri = "";
@@ -71,7 +80,43 @@ public class AngelSoundActivity extends SDLActivity {
     public String getPickedUri() {
         String value = sPickedUri;
         sPickedUri = null;
+        if (value == null) {
+            Set<String> before = sGrantsBeforePick;
+            value = newPersistedTree(before);
+            if (value != null) {
+                sGrantsBeforePick = null;
+            }
+        }
         return value;
+    }
+
+    private Set<String> persistedTreeUris() {
+        Set<String> all = new HashSet<>();
+        try {
+            for (UriPermission p : getContentResolver().getPersistedUriPermissions()) {
+                if (p != null && p.isReadPermission() && p.getUri() != null) {
+                    all.add(p.getUri().toString());
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "persisted uri scan failed", e);
+        }
+        return all;
+    }
+
+    /* Pick a persisted tree URI that was not present when the picker opened. */
+    private String newPersistedTree(Set<String> before) {
+        try {
+            Set<String> now = persistedTreeUris();
+            for (String uri : now) {
+                if (before == null || !before.contains(uri)) {
+                    return uri;
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "new persisted tree scan failed", e);
+        }
+        return null;
     }
 
     private static Uri tree(String value) {
