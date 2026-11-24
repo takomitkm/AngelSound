@@ -44,6 +44,8 @@ public class AngelSoundActivity extends SDLActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        Log.w(TAG, "DIAG result req=" + requestCode + " code=" + resultCode
+                + " data=" + (data == null ? "null" : data.getData()));
         if (requestCode == REQ_PICK_FOLDER) {
             if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
                 Uri uri = data.getData();
