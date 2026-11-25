@@ -101,8 +101,11 @@ void ui_clamp_selection(UiModel *m)
 
 static void add_button(UiButton *buttons, int *count, float x, float y, float w,
                        float h, const char *label, UiAction action, bool enabled,
-                       int style)
+                       int style, int cap)
 {
+    if (*count >= cap) {
+        return; /* caller's buffer is full; never write past it */
+    }
     UiButton *b = &buttons[*count];
     b->rect.x = x;
     b->rect.y = y;
@@ -124,54 +127,52 @@ int ui_layout_buttons(const UiModel *m, UiButton *buttons, int cap)
     if (g_portrait) {
         float y = PORTRAIT_BTN_Y;
         add_button(buttons, &n, LIST_X, y, PORTRAIT_COL, PORTRAIT_BIG_H, "Record",
-                   UI_ACTION_RECORD, st == AUDIO_STATE_IDLE, 1);
+                   UI_ACTION_RECORD, st == AUDIO_STATE_IDLE, 1, cap);
         add_button(buttons, &n, LIST_X + PORTRAIT_COL + PORTRAIT_GAP, y, PORTRAIT_COL,
                    PORTRAIT_BIG_H, "Stop", UI_ACTION_STOP,
-                   st == AUDIO_STATE_RECORDING, 2);
+                   st == AUDIO_STATE_RECORDING, 2, cap);
         y += PORTRAIT_BIG_H + PORTRAIT_GAP;
         add_button(buttons, &n, LIST_X, y, 210, PORTRAIT_BTN_H, "Play",
-                   UI_ACTION_PLAY, has_sel, 3);
+                   UI_ACTION_PLAY, has_sel, 3, cap);
         add_button(buttons, &n, LIST_X + 210 + 12, y, 210, PORTRAIT_BTN_H, "Pause",
-                   UI_ACTION_PAUSE, st == AUDIO_STATE_PLAYING, 3);
+                   UI_ACTION_PAUSE, st == AUDIO_STATE_PLAYING, 3, cap);
         add_button(buttons, &n, LIST_X + 434 + 10, y, 244, PORTRAIT_BTN_H, "Resume",
-                   UI_ACTION_RESUME, st == AUDIO_STATE_PAUSED, 3);
+                   UI_ACTION_RESUME, st == AUDIO_STATE_PAUSED, 3, cap);
         y += PORTRAIT_BTN_H + PORTRAIT_GAP;
         add_button(buttons, &n, LIST_X, y, PORTRAIT_COL, PORTRAIT_BTN_H, "Browse",
-                   UI_ACTION_BROWSE, true, 0);
+                   UI_ACTION_BROWSE, true, 0, cap);
         add_button(buttons, &n, LIST_X + PORTRAIT_COL + PORTRAIT_GAP, y, PORTRAIT_COL,
                    PORTRAIT_BTN_H, "Delete", UI_ACTION_DELETE,
-                   has_sel && st != AUDIO_STATE_RECORDING, 0);
+                   has_sel && st != AUDIO_STATE_RECORDING, 0, cap);
         y += PORTRAIT_BTN_H + PORTRAIT_GAP;
         add_button(buttons, &n, LIST_X, y, PORTRAIT_LIST_W, PORTRAIT_BTN_H,
-                   m->input_label, UI_ACTION_CYCLE_INPUT, true, 0);
+                   m->input_label, UI_ACTION_CYCLE_INPUT, true, 0, cap);
         y += PORTRAIT_BTN_H + PORTRAIT_GAP;
         add_button(buttons, &n, LIST_X, y, PORTRAIT_COL, PORTRAIT_BTN_H, "Folder",
-                   UI_ACTION_CHOOSE_FOLDER, true, 0);
+                   UI_ACTION_CHOOSE_FOLDER, true, 0, cap);
         add_button(buttons, &n, LIST_X + PORTRAIT_COL + PORTRAIT_GAP, y, PORTRAIT_COL,
-                   PORTRAIT_BTN_H, "About", UI_ACTION_ABOUT, true, 0);
-        (void)cap;
+                   PORTRAIT_BTN_H, "About", UI_ACTION_ABOUT, true, 0, cap);
         return n;
     }
 
     add_button(buttons, &n, RIGHT_X, 56, 128, 40, "Record", UI_ACTION_RECORD,
-               st == AUDIO_STATE_IDLE, 1);
+               st == AUDIO_STATE_IDLE, 1, cap);
     add_button(buttons, &n, RIGHT_X + 144, 56, 128, 40, "Stop", UI_ACTION_STOP,
-               st == AUDIO_STATE_RECORDING, 2);
-    add_button(buttons, &n, RIGHT_X, 108, 84, 32, "Play", UI_ACTION_PLAY, has_sel, 3);
+               st == AUDIO_STATE_RECORDING, 2, cap);
+    add_button(buttons, &n, RIGHT_X, 108, 84, 32, "Play", UI_ACTION_PLAY, has_sel, 3, cap);
     add_button(buttons, &n, RIGHT_X + 92, 108, 84, 32, "Pause", UI_ACTION_PAUSE,
-               st == AUDIO_STATE_PLAYING, 3);
+               st == AUDIO_STATE_PLAYING, 3, cap);
     add_button(buttons, &n, RIGHT_X + 184, 108, 88, 32, "Resume", UI_ACTION_RESUME,
-               st == AUDIO_STATE_PAUSED, 3);
-    add_button(buttons, &n, RIGHT_X, 152, 128, 32, "Browse", UI_ACTION_BROWSE, true, 0);
+               st == AUDIO_STATE_PAUSED, 3, cap);
+    add_button(buttons, &n, RIGHT_X, 152, 128, 32, "Browse", UI_ACTION_BROWSE, true, 0, cap);
     add_button(buttons, &n, RIGHT_X + 144, 152, 128, 32, "Delete", UI_ACTION_DELETE,
-               has_sel && st != AUDIO_STATE_RECORDING, 0);
+               has_sel && st != AUDIO_STATE_RECORDING, 0, cap);
     add_button(buttons, &n, RIGHT_X, 196, RIGHT_W, 32, m->input_label,
-               UI_ACTION_CYCLE_INPUT, true, 0);
+               UI_ACTION_CYCLE_INPUT, true, 0, cap);
     add_button(buttons, &n, RIGHT_X, 240, 128, 32, "Folder", UI_ACTION_CHOOSE_FOLDER,
-               true, 0);
+               true, 0, cap);
     add_button(buttons, &n, RIGHT_X + 144, 240, 128, 32, "About", UI_ACTION_ABOUT, true,
-               0);
-    (void)cap;
+               0, cap);
     return n;
 }
 

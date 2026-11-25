@@ -176,6 +176,13 @@ int main(void)
     ui_set_portrait(false);
     CHECK(ui_canvas_h() == (float)UI_LOGICAL_H);
 
+    /* a too-small caller buffer must be honored, not overflowed */
+    UiButton small[3];
+    count = ui_layout_buttons(&m, small, 3);
+    CHECK(count == 3);
+    count = ui_layout_buttons(&m, small, 0);
+    CHECK(count == 0);
+
     if (failures == 0) {
         printf("test_ui_layout: PASS\n");
         return 0;

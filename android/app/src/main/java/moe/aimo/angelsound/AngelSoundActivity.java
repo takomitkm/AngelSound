@@ -256,7 +256,9 @@ public class AngelSoundActivity extends SDLActivity {
                     if (display == null || DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)) {
                         continue;
                     }
-                    if (display.toLowerCase(java.util.Locale.ROOT).endsWith(".wav")) {
+                    /* Only the app's own takes are listed, matching the
+                     * desktop storage_list() which globs ASREC_*.wav. */
+                    if (display.startsWith("ASREC_") && display.endsWith(".wav")) {
                         names.add(display);
                     }
                 }
