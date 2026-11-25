@@ -12,7 +12,9 @@ import android.util.Log;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.ActivityResultRegistry;
+import androidx.activity.result.contract.ActivityResultContract;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.app.ActivityOptionsCompat;
 import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.LifecycleRegistry;
 
@@ -29,26 +31,41 @@ import java.util.Set;
  * static-looking instance methods below through JNI; all ContentResolver work
  * happens on the SDL thread, and the folder picker itself runs on the UI
  * thread. */
-public class AngelSoundActivity extends SDLActivity
-        implements androidx.lifecycle.LifecycleOwner {
+public class AngelSoundActivity extends SDLActivity {
     private static final String TAG = "AngelSound";
 
     private static volatile String sPickedUri;
     private static volatile Set<String> sGrantsBeforePick;
 
-    /* SDLActivity extends plain Activity, not ComponentActivity, so the
-     * registry is driven by a small LifecycleOwner we own.  The registry
-     * still routes through a headless holder activity, so the SAF result
-     * survives this activity being recreated. */
-    private final LifecycleRegistry mLifecycle = new LifecycleRegistry(this);
-    private final ActivityResultRegistry mRegistry = new ActivityResultRegistry();
+    /* ComponentActivity's own registry, copied in miniature: the registry
+     * persists pending keys across recreation and dispatches the result to
+     * the callback registered with it. */
+    private final ActivityResultRegistry mRegistry = new ActivityResultRegistry() {
+        @Override
+        public <I, O> void onLaunch(int requestCode, ActivityResultContract<I, O> contract,
+                                    I input, ActivityOptionsCompat options) {
+            Intent intent = contract.createIntent(AngelSoundActivity.this, input);
+            startActivityForResult(intent, requestCode);
+        }
+    };
     private ActivityResultLauncher<Void> mFolderLauncher;
+
+    /* Minimal LifecycleOwner: the registry only needs a Lifecycle to hook
+     * callback cleanup onto; SDLActivity is a plain Activity, not a
+     * ComponentActivity, so we provide one ourselves. */
+    private static final class Owner implements androidx.lifecycle.LifecycleOwner {
+        private final LifecycleRegistry lifecycle = new LifecycleRegistry(this);
+        Owner() { lifecycle.setCurrentState(Lifecycle.State.CREATED); }
+        @Override public Lifecycle getLifecycle() { return lifecycle; }
+    }
+    private final Owner mOwner = new Owner();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mLifecycle.setCurrentState(Lifecycle.State.RESUMED);
-        mFolderLauncher = mRegistry.register("saf_folder", mLifecycle,
+        /* register() requires the owner to be below STARTED; onCreate qualifies.
+         * The registry restores any pending callback from the saved state. */
+        mFolderLauncher = mRegistry.register("saf_folder", mOwner,
                 new ActivityResultContracts.OpenDocumentTree(),
                 uri -> {
                     if (uri != null) {
@@ -72,11 +89,22 @@ public class AngelSoundActivity extends SDLActivity
         if (sGrantsBeforePick == null) {
             sGrantsBeforePick = persistedTreeUris();
         }
+        if (savedInstanceState != null) {
+            mRegistry.onRestoreInstanceState(savedInstanceState);
+        }
     }
 
     @Override
-    public Lifecycle getLifecycle() {
-        return mLifecycle;
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        mRegistry.onSaveInstanceState(outState);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (!mRegistry.dispatchResult(requestCode, resultCode, data)) {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     public void pickFolder() {
