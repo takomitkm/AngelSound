@@ -168,7 +168,12 @@ static void stop_recording(App *app)
     app->model.selected = recordlist_find(&app->list, app->rec_name);
     char dur[32], toast[192];
     format_seconds(frames, (uint32_t)audio_record_rate(app->engine), dur, sizeof(dur));
-    snprintf(toast, sizeof(toast), "Saved %s (%s)", app->rec_name, dur);
+    if (audio_recording_limited(app->engine)) {
+        snprintf(toast, sizeof(toast), "Saved %s (%s, truncated: 4 GB WAV limit)",
+                 app->rec_name, dur);
+    } else {
+        snprintf(toast, sizeof(toast), "Saved %s (%s)", app->rec_name, dur);
+    }
     ui_set_status(app->ui, toast);
 }
 
@@ -546,6 +551,14 @@ int main(int argc, char **argv)
         SDL_LockMutex(app.lock);
         audio_update(app.engine);
         SDL_UnlockMutex(app.lock);
+
+        /* A take that hit the 4 GB RIFF limit stops writing in place; stop
+         * and save it so the truncated WAV is finalized and the user is told
+         * (stop_recording reports "truncated" in its status line). */
+        if (audio_state(app.engine) == AUDIO_STATE_RECORDING &&
+            audio_recording_limited(app.engine)) {
+            stop_recording(&app);
+        }
 
         app.model.files = (const char *const *)app.list.names;
         app.model.file_count = app.list.count;

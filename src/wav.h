@@ -15,6 +15,10 @@
 typedef struct {
     FILE *fp;
     uint32_t data_bytes;
+    /* Set when a write was refused because it would push the RIFF 32-bit
+     * data length past UINT32_MAX - 36.  The file stays valid (truncated);
+     * the caller decides whether that is an error or a hard stop. */
+    bool limit_reached;
     uint16_t channels;
     uint32_t sample_rate;
     uint16_t bits_per_sample;

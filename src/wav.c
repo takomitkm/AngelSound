@@ -97,6 +97,14 @@ bool wav_writer_write(WavWriter *w, const void *data, size_t bytes)
     if (w->fp == NULL || bytes == 0) {
         return false;
     }
+    /* A plain RIFF WAV stores its data length as a 32-bit field, and the
+     * header reserves 36 bytes before it.  Refuse a write that would push
+     * the count past that; accepting it would wrap and leave a header that
+     * describes a file larger than what is actually on disk. */
+    if ((uint64_t)bytes > (uint64_t)UINT32_MAX - 36u - w->data_bytes) {
+        w->limit_reached = true;
+        return false;
+    }
     if (fwrite(data, 1, bytes, w->fp) != bytes) {
         return false;
     }
@@ -174,7 +182,12 @@ bool wav_read(const char *path, WavAudio *out, char *err, size_t errcap)
         const uint8_t *id = buf + off;
         uint32_t chunk_size = get_u32(buf + off + 4);
         uint32_t body = off + 8;
-        if (body + chunk_size > size) {
+        /* body <= size here (loop condition), so size - body cannot wrap.
+         * Using a subtraction instead of body + chunk_size avoids the 32-bit
+         * wrap where a huge declared size (e.g. 0xfffffff8) would make the
+         * sum come out small and slip past the bound check, letting the
+         * reader copy gigabytes out of a small buffer. */
+        if (chunk_size > size - body) {
             chunk_size = size - body; /* tolerate a truncated data chunk */
         }
         if (memcmp(id, "fmt ", 4) == 0 && chunk_size >= 16) {

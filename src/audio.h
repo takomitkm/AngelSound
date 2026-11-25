@@ -37,6 +37,10 @@ AudioState audio_state(const AudioEngine *a);
 uint64_t audio_record_frames(const AudioEngine *a);
 /* Sample rate of the most recent capture (0 before the first recording). */
 int audio_record_rate(const AudioEngine *a);
+/* True once a recording has been stopped because it hit the RIFF 4 GB data
+ * limit.  The WAV is finalized (valid but truncated); the caller should tell
+ * the user, since the take is incomplete. */
+bool audio_recording_limited(const AudioEngine *a);
 
 bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t errcap);
 bool audio_stop_recording(AudioEngine *a, uint64_t *frames, char *err, size_t errcap);

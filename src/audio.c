@@ -16,6 +16,7 @@ struct AudioEngine {
     SDL_AudioStream *rec_stream;
     WavWriter rec_wav;
     bool rec_wav_open;
+    bool rec_limited;
     uint64_t rec_frames;
     int rec_bytes_per_frame;
     int rec_rate;
@@ -73,6 +74,13 @@ static void pump_recording(AudioEngine *a)
             break;
         }
         if (!wav_writer_write(&a->rec_wav, buf, (size_t)got)) {
+            if (a->rec_wav.limit_reached) {
+                /* The take hit the RIFF 4 GB limit.  Stop writing; the frame
+                 * loop sees audio_recording_limited() and finalizes the WAV
+                 * so the truncated take is still valid. */
+                a->rec_limited = true;
+                break;
+            }
             break; /* keep recording; the file may be incomplete */
         }
         a->rec_frames += (uint64_t)got / (uint64_t)a->rec_bytes_per_frame;
@@ -161,6 +169,11 @@ int audio_record_rate(const AudioEngine *a)
     return a->last_rec_rate;
 }
 
+bool audio_recording_limited(const AudioEngine *a)
+{
+    return a->rec_limited;
+}
+
 bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t errcap)
 {
     if (a->state == AUDIO_STATE_RECORDING) {
@@ -223,6 +236,7 @@ bool audio_start_recording(AudioEngine *a, const char *path, char *err, size_t e
     a->rec_stream = stream;
     a->rec_wav = wav;
     a->rec_wav_open = true;
+    a->rec_limited = false;
     a->rec_frames = 0;
     a->rec_bytes_per_frame = spec.channels * (bits / 8);
     a->rec_rate = spec.freq;

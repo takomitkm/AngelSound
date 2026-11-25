@@ -22,9 +22,10 @@ Entry points: CTest `test_*` executables + `AngelSound --smoke` in CI.
 | ID | Class / mechanism | Result category | Injection / observation | Tests |
 |---|---|---|---|---|
 | FM-1 | WAV header length fields left at zero after recording | corrupt file / bad duration | write samples then re-read header; assert RIFF/data sizes and byte rate | `test_wav` |
+| FM-1b | Recording exceeds the RIFF 32-bit data limit (4 GB) and the count wraps | corrupt file / bad duration | drive `WavWriter.data_bytes` to the limit; assert a write past it is refused (`limit_reached`) and one landing exactly on it is allowed | `test_wav` |
 | FM-2 | 8/16/32-bit float WAV formats misparsed | false corruption | synthesize formats with hand-built headers; assert decoded fields | `test_wav` |
 | FM-3 | WAVE_FORMAT_EXTENSIBLE SubFormat GUID misread (old bug: offset 18 vs 24) | false corruption | 0xFFFE header with PCM tag at +24; assert PCM accepted | `test_wav` (regression) |
-| FM-4 | Malformed / truncated / oversized-declared data chunk read out of bounds or crash | crash | "not a wav", 24-bit unsupported, data length 100 in 48-byte file; assert rejection/clamping | `test_wav` |
+| FM-4 | Malformed / truncated / oversized-declared data chunk read out of bounds or crash | crash | "not a wav", 24-bit unsupported, data length 100 in 48-byte file, and a data size whose body+size sum wraps 32-bit (44 + 0xfffffff8 = 36); assert rejection/clamping | `test_wav` |
 | FM-5 | Practice timer double-counts duplicate take-stop or counts idle time | wrong status | stop twice, start twice, reset; assert takes/session/last and warn threshold | `test_practice` |
 | FM-6 | 5-minute warning fires repeatedly or never | wrong status | cross PRACTICE_WARN_MS, mark_warned, reset; assert one-shot | `test_practice` |
 | FM-7 | Record list duplicates, wrong index after delete, bad sort order | wrong selection | add/sort/find/remove/invalid-index/clear; assert indices | `test_recordlist` |

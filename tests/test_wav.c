@@ -215,6 +215,52 @@ int main(void)
     wav_audio_free(&a);
     remove(path);
 
+    /* a data chunk whose declared size wraps the 32-bit body+size sum (here
+     * 44 + 0xfffffff8 = 36) must not slip past the bound check and make the
+     * reader copy gigabytes out of a 48-byte buffer */
+    unsigned char wrap_data[48];
+    memset(wrap_data, 0, sizeof(wrap_data));
+    memcpy(wrap_data, "RIFF", 4);
+    put32(wrap_data + 4, 40);
+    memcpy(wrap_data + 8, "WAVE", 4);
+    memcpy(wrap_data + 12, "fmt ", 4);
+    put32(wrap_data + 16, 16);
+    put16(wrap_data + 20, 1);
+    put16(wrap_data + 22, 1);
+    put32(wrap_data + 24, 44100);
+    put32(wrap_data + 28, 88200);
+    put16(wrap_data + 32, 2);
+    put16(wrap_data + 34, 16);
+    memcpy(wrap_data + 36, "data", 4);
+    put32(wrap_data + 40, 0xfffffff8u);
+    CHECK(write_bytes(path, wrap_data, sizeof(wrap_data)));
+    CHECK(wav_read(path, &a, err, sizeof(err)));
+    CHECK(a.data_bytes == 4); /* clamped to the 4 real bytes, not wrapped */
+    wav_audio_free(&a);
+    remove(path);
+
+    /* a write that would push the RIFF 32-bit data length past its limit is
+     * refused (limit_reached), not wrapped into a wrong header length */
+    WavWriter wl;
+    CHECK(wav_writer_open(&wl, path, 1, 44100, 16, false, err, sizeof(err)));
+    CHECK(!wl.limit_reached);
+    wl.data_bytes = UINT32_MAX - 36u; /* one byte short of the limit */
+    CHECK(!wav_writer_write(&wl, "x", 2)); /* would exceed */
+    CHECK(wl.limit_reached);
+    CHECK(wl.data_bytes == UINT32_MAX - 36u); /* refused write left it alone */
+    CHECK(wav_writer_close(&wl)); /* the header still describes a valid file */
+    remove(path);
+
+    /* a write that lands exactly on the limit is allowed */
+    WavWriter wl2;
+    CHECK(wav_writer_open(&wl2, path, 1, 44100, 16, false, err, sizeof(err)));
+    wl2.data_bytes = UINT32_MAX - 36u - 1u;
+    CHECK(wav_writer_write(&wl2, "x", 1)); /* lands exactly on the limit */
+    CHECK(!wl2.limit_reached);
+    CHECK(wl2.data_bytes == UINT32_MAX - 36u);
+    CHECK(wav_writer_close(&wl2));
+    remove(path);
+
     if (failures == 0) {
         printf("test_wav: PASS\n");
         return 0;
