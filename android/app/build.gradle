@@ -50,4 +50,8 @@ dependencies {
     // SDL3 AAR is downloaded by CI into libs/ from the official 3.4.20
     // release; it supplies both org.libsdl.app.* and the Prefab native lib.
     implementation files('libs/SDL3-3.4.20.aar')
+    // Activity Result API: SAF results survive activity recreation and are
+    // delivered through a lifecycle-bound launcher instead of
+    // onActivityResult (which some ROMs lose when they destroy the activity).
+    implementation 'androidx.activity:activity:1.9.3'
 }

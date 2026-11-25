@@ -1,15 +1,17 @@
 package moe.aimo.angelsound;
 
 import android.app.Activity;
-import android.content.ActivityNotFoundException;
-import android.content.Intent;
 import android.content.UriPermission;
+import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.util.Log;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 
 import org.libsdl.app.SDLActivity;
 
@@ -26,10 +28,31 @@ import java.util.Set;
  * thread. */
 public class AngelSoundActivity extends SDLActivity {
     private static final String TAG = "AngelSound";
-    private static final int REQ_PICK_FOLDER = 0x4153;
 
     private static volatile String sPickedUri;
     private static volatile Set<String> sGrantsBeforePick;
+
+    /* Lifecycle-bound launcher: the framework keeps the callback alive across
+     * configuration changes / activity recreation via a headless holder. */
+    private final ActivityResultLauncher<Void> mFolderLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.OpenDocumentTree(),
+                    uri -> {
+                        if (uri != null) {
+                            int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+                            try {
+                                getContentResolver()
+                                        .takePersistableUriPermission(uri, flags);
+                            } catch (Exception e) {
+                                Log.w(TAG, "persistable permission failed", e);
+                            }
+                            sPickedUri = uri.toString();
+                            persistFolder(sPickedUri);
+                        } else {
+                            sPickedUri = "";
+                        }
+                    });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -42,45 +65,14 @@ public class AngelSoundActivity extends SDLActivity {
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQ_PICK_FOLDER) {
-            /* Some ROMs hand back RESULT_CANCELED together with a valid tree
-             * URI, so trust the payload instead of the result code. */
-            if (data != null && data.getData() != null) {
-                Uri uri = data.getData();
-                int flags = data.getFlags()
-                        & (Intent.FLAG_GRANT_READ_URI_PERMISSION
-                           | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-                try {
-                    getContentResolver().takePersistableUriPermission(uri, flags);
-                } catch (Exception e) {
-                    Log.w(TAG, "persistable permission failed", e);
-                }
-                sPickedUri = uri.toString();
-                persistFolder(sPickedUri);
-            } else {
-                sPickedUri = "";
-            }
-            /* The folder is already persisted; this ROM removes our task while
-             * the picker is up, so the user reopens the app from the launcher. */
-            return;
-        }
-        super.onActivityResult(requestCode, resultCode, data);
-    }
-
     public void pickFolder() {
         runOnUiThread(() -> {
-            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
             try {
                 sPickedUri = null;
                 sGrantsBeforePick = persistedTreeUris();
-                startActivityForResult(intent, REQ_PICK_FOLDER);
-            } catch (ActivityNotFoundException e) {
-                Log.w(TAG, "no document tree picker", e);
+                mFolderLauncher.launch(null);
+            } catch (Exception e) {
+                Log.w(TAG, "folder launcher failed", e);
                 sPickedUri = "";
             }
         });
