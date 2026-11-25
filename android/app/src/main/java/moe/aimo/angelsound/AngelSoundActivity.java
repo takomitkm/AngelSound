@@ -48,7 +48,7 @@ public class AngelSoundActivity extends SDLActivity {
             startActivityForResult(intent, requestCode);
         }
     };
-    private ActivityResultLauncher<Void> mFolderLauncher;
+    private ActivityResultLauncher<Uri> mFolderLauncher;
 
     /* Minimal LifecycleOwner: the registry only needs a Lifecycle to hook
      * callback cleanup onto; SDLActivity is a plain Activity, not a
