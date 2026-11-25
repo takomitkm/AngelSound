@@ -330,7 +330,6 @@ static bool event_watch(void *userdata, SDL_Event *e)
 }
 
 static bool g_presentation_set;
-static bool g_last_portrait;
 static int g_last_canvas_h;
 #if defined(__ANDROID__)
 /* Set once a folder pick has been observed, so the loop can end after the
@@ -342,8 +341,9 @@ static uint64_t g_activity_gone_since;
 #define ACTIVITY_GONE_TIMEOUT_MS 60000
 #endif
 
-/* Pick the portrait or landscape canvas from the window aspect and keep the
- * logical presentation in sync.  Cheap enough to call every frame. */
+/* The manifest locks the activity to landscape, so the UI always uses the
+ * fixed landscape canvas.  Keep the logical presentation in sync with the
+ * surface.  Cheap enough to call every frame. */
 static void apply_ui_mode(SDL_Window *window, SDL_Renderer *renderer)
 {
     if (window == NULL || renderer == NULL) {
@@ -355,24 +355,14 @@ static void apply_ui_mode(SDL_Window *window, SDL_Renderer *renderer)
     if (w <= 0 || h <= 0) {
         return;
     }
-    bool portrait = h > w;
-    if (portrait) {
-        /* Match the canvas to the surface aspect so the UI fills the screen
-         * instead of being letterboxed away from the edges. */
-        ui_set_portrait(true);
-        ui_set_portrait_size((float)UI_LOGICAL_W * (float)h / (float)w + 0.5f);
-    } else {
-        ui_set_portrait(false);
-    }
+    ui_set_portrait(false);
     int canvas_h = (int)ui_canvas_h();
-    if (g_presentation_set && portrait == g_last_portrait &&
-        canvas_h == g_last_canvas_h) {
+    if (g_presentation_set && canvas_h == g_last_canvas_h) {
         return;
     }
     SDL_SetRenderLogicalPresentation(renderer, UI_LOGICAL_W, canvas_h,
                                      SDL_LOGICAL_PRESENTATION_LETTERBOX);
     g_presentation_set = true;
-    g_last_portrait = portrait;
     g_last_canvas_h = canvas_h;
 }
 
@@ -407,10 +397,11 @@ int main(int argc, char **argv)
     }
 
     #if defined(__ANDROID__)
-    /* Phone screens are portrait; ask for the real display size instead of a
-     * fixed landscape window, then adapt the layout to the actual aspect. */
-    int win_w = 720;
-    int win_h = 1280;
+    /* The manifest locks the activity to landscape, so the surface is a
+     * landscape display.  Ask for the real display size rather than a fixed
+     * guess; SDL resizes the window to the surface anyway. */
+    int win_w = 1280;
+    int win_h = 720;
     SDL_DisplayID display = SDL_GetPrimaryDisplay();
     const SDL_DisplayMode *mode =
         display != 0 ? SDL_GetCurrentDisplayMode(display) : NULL;
