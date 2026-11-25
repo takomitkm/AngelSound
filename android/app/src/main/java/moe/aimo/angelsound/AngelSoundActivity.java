@@ -102,7 +102,23 @@ public class AngelSoundActivity extends SDLActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (!mRegistry.dispatchResult(requestCode, resultCode, data)) {
+        /* Let the Activity Result API try first.  On ROMs that destroy the
+         * activity mid-pick the registry key may be gone, so also handle the
+         * raw result ourselves: some ROMs return CANCELED with a valid URI. */
+        boolean dispatched = mRegistry.dispatchResult(requestCode, resultCode, data);
+        if (data != null && data.getData() != null) {
+            Uri uri = data.getData();
+            int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+            try {
+                getContentResolver().takePersistableUriPermission(uri, flags);
+            } catch (Exception e) {
+                Log.w(TAG, "persistable permission failed", e);
+            }
+            sPickedUri = uri.toString();
+            persistFolder(sPickedUri);
+        }
+        if (!dispatched) {
             super.onActivityResult(requestCode, resultCode, data);
         }
     }
