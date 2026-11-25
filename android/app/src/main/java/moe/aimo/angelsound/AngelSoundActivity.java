@@ -11,7 +11,10 @@ import android.provider.DocumentsContract;
 import android.util.Log;
 
 import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.ActivityResultRegistry;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.lifecycle.Lifecycle;
+import androidx.lifecycle.LifecycleRegistry;
 
 import org.libsdl.app.SDLActivity;
 
@@ -26,43 +29,54 @@ import java.util.Set;
  * static-looking instance methods below through JNI; all ContentResolver work
  * happens on the SDL thread, and the folder picker itself runs on the UI
  * thread. */
-public class AngelSoundActivity extends SDLActivity {
+public class AngelSoundActivity extends SDLActivity
+        implements androidx.lifecycle.LifecycleOwner {
     private static final String TAG = "AngelSound";
 
     private static volatile String sPickedUri;
     private static volatile Set<String> sGrantsBeforePick;
 
-    /* Lifecycle-bound launcher: the framework keeps the callback alive across
-     * configuration changes / activity recreation via a headless holder. */
-    private final ActivityResultLauncher<Void> mFolderLauncher =
-            registerForActivityResult(
-                    new ActivityResultContracts.OpenDocumentTree(),
-                    uri -> {
-                        if (uri != null) {
-                            int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
-                            try {
-                                getContentResolver()
-                                        .takePersistableUriPermission(uri, flags);
-                            } catch (Exception e) {
-                                Log.w(TAG, "persistable permission failed", e);
-                            }
-                            sPickedUri = uri.toString();
-                            persistFolder(sPickedUri);
-                        } else {
-                            sPickedUri = "";
-                        }
-                    });
+    /* SDLActivity extends plain Activity, not ComponentActivity, so the
+     * registry is driven by a small LifecycleOwner we own.  The registry
+     * still routes through a headless holder activity, so the SAF result
+     * survives this activity being recreated. */
+    private final LifecycleRegistry mLifecycle = new LifecycleRegistry(this);
+    private final ActivityResultRegistry mRegistry = new ActivityResultRegistry();
+    private ActivityResultLauncher<Void> mFolderLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mLifecycle.setCurrentState(Lifecycle.State.RESUMED);
+        mFolderLauncher = mRegistry.register("saf_folder", mLifecycle,
+                new ActivityResultContracts.OpenDocumentTree(),
+                uri -> {
+                    if (uri != null) {
+                        int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+                        try {
+                            getContentResolver()
+                                    .takePersistableUriPermission(uri, flags);
+                        } catch (Exception e) {
+                            Log.w(TAG, "persistable permission failed", e);
+                        }
+                        sPickedUri = uri.toString();
+                        persistFolder(sPickedUri);
+                    } else {
+                        sPickedUri = "";
+                    }
+                });
         /* Treat grants that survive process/activity recreation as the
          * baseline.  Only grants added by a picker opened in this process
          * should be reported as a fresh folder choice. */
         if (sGrantsBeforePick == null) {
             sGrantsBeforePick = persistedTreeUris();
         }
+    }
+
+    @Override
+    public Lifecycle getLifecycle() {
+        return mLifecycle;
     }
 
     public void pickFolder() {
