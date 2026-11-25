@@ -53,5 +53,10 @@ dependencies {
     // Activity Result API: SAF results survive activity recreation and are
     // delivered through a lifecycle-bound launcher instead of
     // onActivityResult (which some ROMs lose when they destroy the activity).
-    implementation 'androidx.activity:activity:1.9.3'
+    implementation('androidx.activity:activity:1.9.3') {
+        // Its transitive Kotlin stdlib conflicts with the older
+        // kotlin-stdlib-jdk8 pulled in by other AndroidX modules.
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+        exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+    }
 }
