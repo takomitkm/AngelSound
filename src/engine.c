@@ -625,6 +625,17 @@ void engine_start(void)
         bool paused_now = g_paused;
         bool picker_open = g_picker_open;
         push_unlock();
+        if (picker_open) {
+            /* SAF picker 让这台 ROM 销毁并重建 Activity。旧 Activity 的
+             * onDestroy() 会走 SDLActivity.nativeQuit()，销毁 SDL 的全局
+             * mutex/信号量/AssetManager。此时本线程若继续 PollEvent 或
+             * ui_render，会碰到已销毁的 SDL 状态并在 SDL_RenderDebugText
+             * 里触发堆损坏 (SIGSEGV in jemalloc)。保持线程存活、不调用
+             * 任何 SDL API，只等 Java 回调清除门控；SDL_Delay 在 Android
+             * 上只是 nanosleep，不依赖 SDL 的全局状态。 */
+            SDL_Delay(50);
+            continue;
+        }
         /* The SAF picker destroys the Activity on some ROMs, which calls
          * onDestroy() and asks the engine to stop.  Keep running until the
          * picker result (or a cancel) arrives and clears the gate. */
