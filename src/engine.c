@@ -599,6 +599,14 @@ void engine_set_folder(const char *uri_or_path)
 void engine_request_folder_picker(void)
 {
 #if defined(__ANDROID__)
+    /* Set the QUIT gate synchronously BEFORE the Java picker can destroy the
+     * activity.  The old polling code did the same with g_folder_pending;
+     * doing it in Java's runOnUiThread callback was a race: the SDL thread
+     * returns from this call immediately and sees QUIT before the callback
+     * ever runs. */
+    push_lock();
+    g_picker_open = true;
+    push_unlock();
     android_storage_show_picker();
 #else
     storage_choose_folder();
@@ -615,8 +623,12 @@ void engine_start(void)
         push_lock();
         bool stop_requested = g_stop_requested;
         bool paused_now = g_paused;
+        bool picker_open = g_picker_open;
         push_unlock();
-        if (stop_requested) {
+        /* The SAF picker destroys the Activity on some ROMs, which calls
+         * onDestroy() and asks the engine to stop.  Keep running until the
+         * picker result (or a cancel) arrives and clears the gate. */
+        if (stop_requested && !picker_open) {
             g_running = false;
             break;
         }
@@ -753,17 +765,6 @@ Java_moe_aimo_angelsound_AngelSoundActivity_nativeSetFolder(JNIEnv *env, jclass 
         engine_set_folder(chars);
         (*env)->ReleaseStringUTFChars(env, folder, chars);
     }
-}
-
-JNIEXPORT void JNICALL
-Java_moe_aimo_angelsound_AngelSoundActivity_nativeFolderPickerOpened(JNIEnv *env,
-                                                                     jclass clazz)
-{
-    (void)env;
-    (void)clazz;
-    push_lock();
-    g_picker_open = true;
-    push_unlock();
 }
 
 JNIEXPORT void JNICALL

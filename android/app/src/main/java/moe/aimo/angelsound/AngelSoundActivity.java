@@ -97,12 +97,10 @@ public class AngelSoundActivity extends SDLActivity {
         runOnUiThread(() -> {
             try {
                 mPickerOpen = true;
-                nativeFolderPickerOpened();
                 mFolderLauncher.launch(null);
             } catch (Exception e) {
                 Log.w(TAG, "folder launcher failed", e);
                 mPickerOpen = false;
-                nativeFolderPickerClosed();
             }
         });
     }
@@ -124,7 +122,6 @@ public class AngelSoundActivity extends SDLActivity {
     }
 
     private static native void nativeSetFolder(String uri);
-    private static native void nativeFolderPickerOpened();
     private static native void nativeFolderPickerClosed();
     private static native void nativeStop();
 
