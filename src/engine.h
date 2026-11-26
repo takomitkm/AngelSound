@@ -17,7 +17,5 @@ void engine_stop(void);
 void engine_set_folder(const char *uri_or_path);
 /* Request the Java-side folder picker from native (Android only). */
 void engine_request_folder_picker(void);
-/* One-shot microphone permission result pushed from Java. */
-void engine_set_microphone_granted(bool granted);
 
 #endif /* ANGELSOUND_ENGINE_H */

@@ -319,16 +319,19 @@ bool android_storage_write_from_cache(const char *uri, const char *name, const c
     return call_three_strings(uri, name, src, g_write, "writeFromCache");
 }
 
+static bool g_mic_granted;
+
 static void SDLCALL mic_callback(void *userdata, const char *permission, bool granted)
 {
     (void)userdata;
     (void)permission;
+    g_mic_granted = granted;
     android_storage_queue_microphone(granted);
 }
 
 bool android_permission_granted(void)
 {
-    return SDL_IsAndroidPermissionGranted("android.permission.RECORD_AUDIO");
+    return g_mic_granted;
 }
 
 bool android_request_microphone(void)

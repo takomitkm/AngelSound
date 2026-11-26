@@ -1,5 +1,4 @@
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_main.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +13,8 @@
 #include "ui.h"
 
 #if defined(__ANDROID__)
+#include <SDL3/SDL_main.h>
+#include <jni.h>
 #include "android_storage.h"
 #endif
 
@@ -595,18 +596,6 @@ void engine_set_folder(const char *uri_or_path)
 #endif
 }
 
-void engine_set_microphone_granted(bool granted)
-{
-#if defined(__ANDROID__)
-    if (!g_created) {
-        return;
-    }
-    android_storage_queue_microphone(granted);
-#else
-    (void)granted;
-#endif
-}
-
 void engine_request_folder_picker(void)
 {
 #if defined(__ANDROID__)
@@ -755,10 +744,10 @@ int SDL_main(int argc, char **argv)
 }
 
 JNIEXPORT void JNICALL
-Java_moe_aimo_angelsound_AngelSoundActivity_nativeSetFolder(JNIEnv *env, jobject thiz,
+Java_moe_aimo_angelsound_AngelSoundActivity_nativeSetFolder(JNIEnv *env, jclass clazz,
                                                              jstring folder)
 {
-    (void)thiz;
+    (void)clazz;
     const char *chars = folder != NULL ? (*env)->GetStringUTFChars(env, folder, NULL) : NULL;
     if (chars != NULL) {
         engine_set_folder(chars);
@@ -768,10 +757,10 @@ Java_moe_aimo_angelsound_AngelSoundActivity_nativeSetFolder(JNIEnv *env, jobject
 
 JNIEXPORT void JNICALL
 Java_moe_aimo_angelsound_AngelSoundActivity_nativeFolderPickerOpened(JNIEnv *env,
-                                                                     jobject thiz)
+                                                                     jclass clazz)
 {
     (void)env;
-    (void)thiz;
+    (void)clazz;
     push_lock();
     g_picker_open = true;
     push_unlock();
@@ -779,20 +768,20 @@ Java_moe_aimo_angelsound_AngelSoundActivity_nativeFolderPickerOpened(JNIEnv *env
 
 JNIEXPORT void JNICALL
 Java_moe_aimo_angelsound_AngelSoundActivity_nativeFolderPickerClosed(JNIEnv *env,
-                                                                    jobject thiz)
+                                                                    jclass clazz)
 {
     (void)env;
-    (void)thiz;
+    (void)clazz;
     push_lock();
     g_picker_open = false;
     push_unlock();
 }
 
 JNIEXPORT void JNICALL
-Java_moe_aimo_angelsound_AngelSoundActivity_nativeStop(JNIEnv *env, jobject thiz)
+Java_moe_aimo_angelsound_AngelSoundActivity_nativeStop(JNIEnv *env, jclass clazz)
 {
     (void)env;
-    (void)thiz;
+    (void)clazz;
     engine_request_stop();
 }
 

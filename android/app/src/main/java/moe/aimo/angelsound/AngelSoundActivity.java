@@ -113,14 +113,6 @@ public class AngelSoundActivity extends SDLActivity {
         super.onDestroy();
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                                           int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        boolean granted = grantResults.length > 0 && grantResults[0] == 0;
-        nativeMicrophoneResult(granted);
-    }
-
     private void persistFolder(String uri) {
         try (java.io.FileOutputStream out =
                      openFileOutput("settings.txt", android.content.Context.MODE_PRIVATE)) {
@@ -135,7 +127,6 @@ public class AngelSoundActivity extends SDLActivity {
     private static native void nativeFolderPickerOpened();
     private static native void nativeFolderPickerClosed();
     private static native void nativeStop();
-    private static native void nativeMicrophoneResult(boolean granted);
 
     private static Uri tree(String value) {
         if (value == null || value.isEmpty()) {
