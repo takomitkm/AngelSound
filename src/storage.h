@@ -23,12 +23,15 @@ bool storage_playback_path(const char *name, char *path, size_t cap, char *err,
                            size_t errcap);
 bool storage_delete(const char *name, char *err, size_t errcap);
 
+/* One-shot folder application.  `location` is either a filesystem path or an
+ * Android SAF `content://` tree URI; `saf` selects the access backend. */
+bool storage_set_location(const char *location, bool saf, char *err, size_t errcap);
+
+/* Desktop-only folder dialog plumbing. */
 bool storage_choose_folder(void);
-/* 0 = no result, 1 = location changed, -1 = pick failed */
+void storage_choose_folder_path(const char *path);
+/* 0 = no result, 1 = a path was chosen, -1 = pick failed/canceled. */
 int storage_poll_folder(void);
-/* True while a folder pick is in flight.  The Android port uses this to keep
- * the native loop alive across the ROM tearing the activity down for the
- * picker, without leaving a zombie thread afterwards. */
-bool storage_folder_pending(void);
+bool storage_apply_pending_folder(void);
 
 #endif /* ANGELSOUND_STORAGE_H */

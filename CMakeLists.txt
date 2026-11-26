@@ -55,7 +55,7 @@ target_link_libraries(angelsound_audio PUBLIC angelsound_common SDL3::SDL3)
 
 if(ANDROID)
     add_library(AngelSound SHARED
-        src/main.c
+        src/engine.c
         src/ui.c
         src/storage.c
         src/android_storage.c)
@@ -63,7 +63,7 @@ if(ANDROID)
     target_include_directories(AngelSound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     set_target_properties(AngelSound PROPERTIES OUTPUT_NAME "main")
 else()
-    add_executable(AngelSound src/main.c src/ui.c src/storage.c)
+    add_executable(AngelSound src/main.c src/engine.c src/ui.c src/storage.c)
     target_link_libraries(AngelSound PRIVATE angelsound_audio)
     target_include_directories(AngelSound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 endif()

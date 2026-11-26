@@ -23,13 +23,6 @@ static bool g_saf;
 static bool g_folder_pending;
 static int g_folder_result; /* 0 none, 1 picked, -1 canceled/failed */
 static char g_folder_value[PATH_CAP];
-#if defined(__ANDROID__)
-/* Grace period before the SAF picker result is considered lost.  Some ROMs
- * destroy the activity that launched the picker, so the result never
- * arrives; after this delay we fall back to the public folder. */
-static uint64_t g_folder_deadline;
-#define FOLDER_PICK_GRACE_MS 30000
-#endif
 
 static void set_err(char *err, size_t cap, const char *text)
 {
@@ -120,6 +113,13 @@ static void save_settings(void)
     }
 }
 
+static bool apply_location(const char *location, bool saf, char *err, size_t errcap);
+
+bool storage_set_location(const char *location, bool saf, char *err, size_t errcap)
+{
+    return apply_location(location, saf, err, errcap);
+}
+
 static bool apply_location(const char *location, bool saf, char *err, size_t errcap)
 {
     if (location == NULL || *location == '\0') {
@@ -149,9 +149,6 @@ bool storage_init(char *err, size_t errcap)
     g_saf = false;
     g_folder_pending = false;
     g_folder_result = 0;
-#if defined(__ANDROID__)
-    g_folder_deadline = 0;
-#endif
 
     char *pref = SDL_GetPrefPath("Aimo", "AngelSound");
     if (pref != NULL) {
@@ -374,92 +371,48 @@ static void SDLCALL folder_cb(void *userdata, const char *const *filelist, int f
 {
     (void)userdata;
     (void)filter;
+    g_folder_result = 0;
+    g_folder_value[0] = '\0';
     if (filelist != NULL && filelist[0] != NULL) {
         snprintf(g_folder_value, sizeof(g_folder_value), "%s", filelist[0]);
         g_folder_result = 1;
-    } else {
-        g_folder_result = -1;
     }
 }
-#endif
 
 bool storage_choose_folder(void)
 {
     if (g_folder_pending) {
         return false;
     }
-#if defined(__ANDROID__)
-    if (!android_storage_pick_folder()) {
-        return false;
-    }
-    g_folder_pending = true;
-    g_folder_result = 0;
-    g_folder_deadline = SDL_GetTicks() + FOLDER_PICK_GRACE_MS;
-    return true;
-#else
     g_folder_result = 0;
     g_folder_value[0] = '\0';
-    SDL_ShowOpenFolderDialog(folder_cb, NULL, NULL, g_saf ? NULL : g_location, false);
+    SDL_ShowOpenFolderDialog(folder_cb, NULL, NULL, g_location, false);
     g_folder_pending = true;
     return true;
-#endif
 }
 
-bool storage_folder_pending(void)
+void storage_choose_folder_path(const char *path)
 {
-    return g_folder_pending;
+    g_folder_value[0] = '\0';
+    snprintf(g_folder_value, sizeof(g_folder_value), "%s",
+             path != NULL ? path : "");
+    g_folder_result = 1;
+    g_folder_pending = true;
 }
 
 int storage_poll_folder(void)
 {
-#if defined(__ANDROID__)
-    char *uri = android_storage_take_picked_uri();
-    if (uri == NULL) {
-        /* No SAF result yet.  If the picker has been open long enough, the
-         * result is never going to arrive (the activity was destroyed), so
-         * fall back to the public recordings folder. */
-        /* Only fall back once the picker is gone (the activity is alive
-         * again) and the user had time to choose something. */
-        if (g_folder_pending && SDL_GetTicks() >= g_folder_deadline &&
-            android_storage_activity_alive()) {
-            char *fallback = android_storage_public_folder();
-            g_folder_pending = false;
-            if (fallback == NULL || *fallback == '\0') {
-                free(fallback);
-                return -1;
-            }
-            bool ok = apply_location(fallback, false, NULL, 0);
-            free(fallback);
-            return ok ? 1 : -1;
-        }
-        return 0;
-    }
-    if (*uri == '\0') {
-        free(uri);
-        g_folder_pending = false;
-        return -1;
-    }
-    /* On Android the picker may destroy/recreate the activity, losing the
-     * pending flag.  Accept a URI whenever the Java side found a fresh
-     * persisted grant, but skip it if it is already the current folder. */
-    if (!g_folder_pending && strcmp(g_location, uri) == 0) {
-        free(uri);
-        return 0;
-    }
-    bool ok = apply_location(uri, true, NULL, 0);
-    free(uri);
-    g_folder_pending = false;
-    return ok ? 1 : -1;
-#else
     if (!g_folder_pending) {
         return 0;
     }
     int result = g_folder_result;
     g_folder_result = 0;
     g_folder_pending = false;
-    if (result < 0) {
-        return -1;
-    }
-    return apply_location(g_folder_value, false, NULL, 0) ? 1 : -1;
-#endif
+    return result;
 }
+
+bool storage_apply_pending_folder(void)
+{
+    return apply_location(g_folder_value, false, NULL, 0);
+}
+#endif /* !__ANDROID__ */

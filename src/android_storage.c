@@ -10,16 +10,12 @@
 
 static jclass g_cls;
 static jmethodID g_pick;
-static jmethodID g_take_uri;
-static jmethodID g_public_folder;
-static jmethodID g_alive;
 static jmethodID g_list;
 static jmethodID g_exists;
 static jmethodID g_read;
 static jmethodID g_write;
 static jmethodID g_delete;
 
-static int g_mic_state;
 
 typedef struct {
     JNIEnv *env;
@@ -45,13 +41,8 @@ static bool jni_ready(JNIEnv *env, jobject activity, JniCall *call)
         g_cls = (jclass)(*env)->NewGlobalRef(env, local);
         (*env)->DeleteLocalRef(env, local);
     }
-    if (g_pick == NULL) {
+    if (g_list == NULL) {
         g_pick = (*env)->GetMethodID(env, g_cls, "pickFolder", "()V");
-        g_take_uri = (*env)->GetMethodID(env, g_cls, "getPickedUri",
-                                         "()Ljava/lang/String;");
-        g_public_folder = (*env)->GetMethodID(env, g_cls, "getPublicFolder",
-                                              "()Ljava/lang/String;");
-        g_alive = (*env)->GetMethodID(env, g_cls, "isActivityAlive", "()Z");
         g_list = (*env)->GetMethodID(env, g_cls, "listWavs",
                                      "(Ljava/lang/String;)[Ljava/lang/String;");
         g_exists = (*env)->GetMethodID(env, g_cls, "exists",
@@ -70,9 +61,8 @@ static bool jni_ready(JNIEnv *env, jobject activity, JniCall *call)
         (*env)->ExceptionClear(env);
         return false;
     }
-    call->ready = g_pick != NULL && g_take_uri != NULL && g_list != NULL &&
-                  g_exists != NULL && g_read != NULL && g_write != NULL &&
-                  g_delete != NULL;
+    call->ready = g_pick != NULL && g_list != NULL && g_exists != NULL && g_read != NULL &&
+                  g_write != NULL && g_delete != NULL;
     return call->ready;
 }
 
@@ -107,81 +97,88 @@ static jstring make_string(JNIEnv *env, const char *text)
     return (*env)->NewStringUTF(env, text != NULL ? text : "");
 }
 
-bool android_storage_pick_folder(void)
+/* Java calls the native push exports below directly.  They queue an owned
+ * copy because JNI stringRefs are only valid for the duration of the call. */
+static SDL_Mutex *g_queue_lock;
+static char *g_queued_folder;
+static bool g_queued_mic;
+static bool g_queued_mic_value;
+
+void android_storage_queue_folder(const char *uri)
+{
+    char *copy = NULL;
+    if (uri != NULL && *uri != '\0') {
+        size_t len = strlen(uri);
+        copy = malloc(len + 1);
+        if (copy != NULL) {
+            memcpy(copy, uri, len + 1);
+        }
+    }
+    if (g_queue_lock == NULL) {
+        g_queue_lock = SDL_CreateMutex();
+    }
+    if (g_queue_lock != NULL) {
+        SDL_LockMutex(g_queue_lock);
+    }
+    free(g_queued_folder);
+    g_queued_folder = copy;
+    if (g_queue_lock != NULL) {
+        SDL_UnlockMutex(g_queue_lock);
+    }
+}
+
+void android_storage_show_picker(void)
 {
     JniCall call;
     if (!jni_begin(&call)) {
-        return false;
+        return;
     }
     (*call.env)->CallVoidMethod(call.env, call.activity, g_pick);
-    bool ok = !check_exception(call.env, "pickFolder");
+    check_exception(call.env, "pickFolder");
     jni_end(&call);
-    return ok;
 }
 
-char *android_storage_take_picked_uri(void)
+bool android_storage_take_pending_folder(char **out)
 {
-    JniCall call;
-    if (!jni_begin(&call)) {
-        return NULL;
-    }
-    JNIEnv *env = call.env;
-    jstring value = (jstring)(*env)->CallObjectMethod(env, call.activity, g_take_uri);
-    char *copy = NULL;
-    if (!check_exception(env, "getPickedUri") && value != NULL) {
-        const char *chars = (*env)->GetStringUTFChars(env, value, NULL);
-        if (chars != NULL) {
-            size_t len = strlen(chars);
-            copy = malloc(len + 1);
-            if (copy != NULL) {
-                memcpy(copy, chars, len + 1);
-            }
-            (*env)->ReleaseStringUTFChars(env, value, chars);
-        }
-        (*env)->DeleteLocalRef(env, value);
-    }
-    jni_end(&call);
-    return copy;
-}
-
-
-bool android_storage_activity_alive(void)
-{
-    JniCall call;
-    if (!jni_begin(&call)) {
+    *out = NULL;
+    if (g_queue_lock == NULL) {
         return false;
     }
-    jboolean alive =
-        (*call.env)->CallBooleanMethod(call.env, call.activity, g_alive);
-    bool ok = !check_exception(call.env, "isActivityAlive") && alive == JNI_TRUE;
-    jni_end(&call);
-    return ok;
+    SDL_LockMutex(g_queue_lock);
+    *out = g_queued_folder;
+    g_queued_folder = NULL;
+    SDL_UnlockMutex(g_queue_lock);
+    return *out != NULL;
 }
 
-char *android_storage_public_folder(void)
+void android_storage_queue_microphone(bool granted)
 {
-    JniCall call;
-    if (!jni_begin(&call)) {
-        return NULL;
+    if (g_queue_lock == NULL) {
+        g_queue_lock = SDL_CreateMutex();
     }
-    JNIEnv *env = call.env;
-    jstring value =
-        (jstring)(*env)->CallObjectMethod(env, call.activity, g_public_folder);
-    char *copy = NULL;
-    if (!check_exception(env, "getPublicFolder") && value != NULL) {
-        const char *chars = (*env)->GetStringUTFChars(env, value, NULL);
-        if (chars != NULL) {
-            size_t len = strlen(chars);
-            copy = malloc(len + 1);
-            if (copy != NULL) {
-                memcpy(copy, chars, len + 1);
-            }
-            (*env)->ReleaseStringUTFChars(env, value, chars);
-        }
-        (*env)->DeleteLocalRef(env, value);
+    if (g_queue_lock != NULL) {
+        SDL_LockMutex(g_queue_lock);
     }
-    jni_end(&call);
-    return copy;
+    g_queued_mic = true;
+    g_queued_mic_value = granted;
+    if (g_queue_lock != NULL) {
+        SDL_UnlockMutex(g_queue_lock);
+    }
+}
+
+bool android_storage_take_microphone_result(bool *granted)
+{
+    if (g_queue_lock == NULL) {
+        return false;
+    }
+    SDL_LockMutex(g_queue_lock);
+    bool ready = g_queued_mic;
+    if (ready) {
+        *granted = g_queued_mic_value;
+        g_queued_mic = false;
+    }
+    SDL_UnlockMutex(g_queue_lock);
+    return ready;
 }
 
 bool android_storage_list(const char *uri, char ***names, int *count)
@@ -326,19 +323,18 @@ static void SDLCALL mic_callback(void *userdata, const char *permission, bool gr
 {
     (void)userdata;
     (void)permission;
-    g_mic_state = granted ? 1 : -1;
+    android_storage_queue_microphone(granted);
+}
+
+bool android_permission_granted(void)
+{
+    return SDL_IsAndroidPermissionGranted("android.permission.RECORD_AUDIO");
 }
 
 bool android_request_microphone(void)
 {
-    g_mic_state = 0;
     return SDL_RequestAndroidPermission("android.permission.RECORD_AUDIO", mic_callback,
                                         NULL);
-}
-
-int android_microphone_state(void)
-{
-    return g_mic_state;
 }
 
 #endif /* __ANDROID__ */

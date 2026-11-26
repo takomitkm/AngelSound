@@ -1,12 +1,9 @@
 package moe.aimo.angelsound;
 
-import android.app.Activity;
-import android.content.UriPermission;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.util.Log;
 
@@ -24,22 +21,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.HashSet;
-import java.util.Set;
 
-/* SDLActivity entry point plus a thin SAF bridge.  The native side calls the
- * static-looking instance methods below through JNI; all ContentResolver work
- * happens on the SDL thread, and the folder picker itself runs on the UI
- * thread. */
+/* Activity owns the Android lifecycle.  Native is a passive engine: it only
+ * receives folder/permission/lifecycle callbacks and the SAF file operations
+ * it needs for an explicit read/write/delete. */
 public class AngelSoundActivity extends SDLActivity {
     private static final String TAG = "AngelSound";
 
-    private static volatile String sPickedUri;
-    private static volatile Set<String> sGrantsBeforePick;
-
-    /* ComponentActivity's own registry, copied in miniature: the registry
-     * persists pending keys across recreation and dispatches the result to
-     * the callback registered with it. */
     private final ActivityResultRegistry mRegistry = new ActivityResultRegistry() {
         @Override
         public <I, O> void onLaunch(int requestCode, ActivityResultContract<I, O> contract,
@@ -50,45 +38,19 @@ public class AngelSoundActivity extends SDLActivity {
     };
     private ActivityResultLauncher<Uri> mFolderLauncher;
 
-    /* Minimal LifecycleOwner: the registry only needs a Lifecycle to hook
-     * callback cleanup onto; SDLActivity is a plain Activity, not a
-     * ComponentActivity, so we provide one ourselves. */
     private static final class Owner implements androidx.lifecycle.LifecycleOwner {
         private final LifecycleRegistry lifecycle = new LifecycleRegistry(this);
         Owner() { lifecycle.setCurrentState(Lifecycle.State.CREATED); }
         @Override public Lifecycle getLifecycle() { return lifecycle; }
     }
     private final Owner mOwner = new Owner();
+    private boolean mPickerOpen;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        /* register() requires the owner to be below STARTED; onCreate qualifies.
-         * The registry restores any pending callback from the saved state. */
         mFolderLauncher = mRegistry.register("saf_folder", mOwner,
-                new ActivityResultContracts.OpenDocumentTree(),
-                uri -> {
-                    if (uri != null) {
-                        int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
-                        try {
-                            getContentResolver()
-                                    .takePersistableUriPermission(uri, flags);
-                        } catch (Exception e) {
-                            Log.w(TAG, "persistable permission failed", e);
-                        }
-                        sPickedUri = uri.toString();
-                        persistFolder(sPickedUri);
-                    } else {
-                        sPickedUri = "";
-                    }
-                });
-        /* Treat grants that survive process/activity recreation as the
-         * baseline.  Only grants added by a picker opened in this process
-         * should be reported as a fresh folder choice. */
-        if (sGrantsBeforePick == null) {
-            sGrantsBeforePick = persistedTreeUris();
-        }
+                new ActivityResultContracts.OpenDocumentTree(), this::onFolderChosen);
         if (savedInstanceState != null) {
             mRegistry.onRestoreInstanceState(savedInstanceState);
         }
@@ -100,23 +62,31 @@ public class AngelSoundActivity extends SDLActivity {
         mRegistry.onSaveInstanceState(outState);
     }
 
+    private void onFolderChosen(Uri uri) {
+        mPickerOpen = false;
+        nativeFolderPickerClosed();
+        if (uri == null) {
+            return;
+        }
+        int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
+        try {
+            getContentResolver().takePersistableUriPermission(uri, flags);
+        } catch (Exception e) {
+            Log.w(TAG, "persistable permission failed", e);
+        }
+        String value = uri.toString();
+        persistFolder(value);
+        nativeSetFolder(value);
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        /* Let the Activity Result API try first.  On ROMs that destroy the
-         * activity mid-pick the registry key may be gone, so also handle the
-         * raw result ourselves: some ROMs return CANCELED with a valid URI. */
         boolean dispatched = mRegistry.dispatchResult(requestCode, resultCode, data);
+        /* Some ROMs return CANCELED but still deliver a valid tree URI.  Trust
+         * the payload: this is the only reliable signal on those devices. */
         if (data != null && data.getData() != null) {
-            Uri uri = data.getData();
-            int flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION;
-            try {
-                getContentResolver().takePersistableUriPermission(uri, flags);
-            } catch (Exception e) {
-                Log.w(TAG, "persistable permission failed", e);
-            }
-            sPickedUri = uri.toString();
-            persistFolder(sPickedUri);
+            onFolderChosen(data.getData());
         }
         if (!dispatched) {
             super.onActivityResult(requestCode, resultCode, data);
@@ -126,103 +96,46 @@ public class AngelSoundActivity extends SDLActivity {
     public void pickFolder() {
         runOnUiThread(() -> {
             try {
-                sPickedUri = null;
-                sGrantsBeforePick = persistedTreeUris();
+                mPickerOpen = true;
+                nativeFolderPickerOpened();
                 mFolderLauncher.launch(null);
             } catch (Exception e) {
                 Log.w(TAG, "folder launcher failed", e);
-                sPickedUri = "";
+                mPickerOpen = false;
+                nativeFolderPickerClosed();
             }
         });
     }
 
-    /* Public fallback folder used when the SAF picker cannot deliver a result.
-     * The app holds the sdcard_rw group, so a plain path works here. */
-
-    /* Native side polls this to decide when the picker round trip is over. */
-    public boolean isActivityAlive() {
-        return !isFinishing() && !isDestroyed();
+    @Override
+    protected void onDestroy() {
+        nativeStop();
+        super.onDestroy();
     }
 
-    public String getPublicFolder() {
-        try {
-            File music = Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_MUSIC);
-            File dir = new File(music, "AngelSound");
-            /* canWrite() is false under scoped storage even when the app can
-             * really write there, so only the directory creation decides. */
-            if (!dir.isDirectory() && !dir.mkdirs()) {
-                return "";
-            }
-            return dir.getAbsolutePath();
-        } catch (Exception e) {
-            Log.w(TAG, "public folder lookup failed", e);
-            return "";
-        }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                                           int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        boolean granted = grantResults.length > 0 && grantResults[0] == 0;
+        nativeMicrophoneResult(granted);
     }
 
-    public String getPickedUri() {
-        String value = sPickedUri;
-        sPickedUri = null;
-        if (value == null) {
-            Set<String> before = sGrantsBeforePick;
-            value = newPersistedTree(before);
-            if (value != null) {
-                /* Native poll found a fresh grant: mirror it so storage_init
-                 * in a restarted process reads the chosen folder, then move
-                 * the baseline forward so it is only reported once. */
-                persistFolder(value);
-                sGrantsBeforePick = persistedTreeUris();
-            }
-        }
-        return value;
-    }
-
-    private Set<String> persistedTreeUris() {
-        Set<String> all = new HashSet<>();
-        try {
-            for (UriPermission p : getContentResolver().getPersistedUriPermissions()) {
-                if (p != null && p.isReadPermission() && p.getUri() != null) {
-                    all.add(p.getUri().toString());
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "persisted uri scan failed", e);
-        }
-        return all;
-    }
-
-    /* Pick a persisted tree URI that was not present when the picker opened. */
-    private String newPersistedTree(Set<String> before) {
-        try {
-            Set<String> now = persistedTreeUris();
-            for (String uri : now) {
-                if (before == null || !before.contains(uri)) {
-                    return uri;
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "new persisted tree scan failed", e);
-        }
-        return null;
-    }
-
-    /* Mirror the chosen tree URI to the file the native storage layer reads. */
     private void persistFolder(String uri) {
-        File settings = new File(getFilesDir(), "settings.txt");
-        FileOutputStream out = null;
-        try {
-            out = new FileOutputStream(settings, false);
+        try (java.io.FileOutputStream out =
+                     openFileOutput("settings.txt", android.content.Context.MODE_PRIVATE)) {
             out.write(("recordings_dir=" + uri + "\n").getBytes("UTF-8"));
             out.flush();
         } catch (Exception e) {
             Log.w(TAG, "persist folder failed", e);
-        } finally {
-            if (out != null) {
-                try { out.close(); } catch (Exception ignored) { }
-            }
         }
     }
+
+    private static native void nativeSetFolder(String uri);
+    private static native void nativeFolderPickerOpened();
+    private static native void nativeFolderPickerClosed();
+    private static native void nativeStop();
+    private static native void nativeMicrophoneResult(boolean granted);
 
     private static Uri tree(String value) {
         if (value == null || value.isEmpty()) {
