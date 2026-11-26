@@ -44,6 +44,7 @@ public class AngelSoundActivity extends SDLActivity {
         @Override public Lifecycle getLifecycle() { return lifecycle; }
     }
     private final Owner mOwner = new Owner();
+    private static volatile boolean sPickerPending;
     private boolean mPickerOpen;
 
     @Override
@@ -64,6 +65,7 @@ public class AngelSoundActivity extends SDLActivity {
 
     private void onFolderChosen(Uri uri) {
         mPickerOpen = false;
+        sPickerPending = false;
         if (uri == null) {
             return;
         }
@@ -101,10 +103,12 @@ public class AngelSoundActivity extends SDLActivity {
         runOnUiThread(() -> {
             try {
                 mPickerOpen = true;
+                sPickerPending = true;
                 mFolderLauncher.launch(null);
             } catch (Exception e) {
                 Log.w(TAG, "folder launcher failed", e);
                 mPickerOpen = false;
+                sPickerPending = false;
                     }
         });
     }
@@ -118,6 +122,20 @@ public class AngelSoundActivity extends SDLActivity {
         if (mPickerOpen) {
             mPickerOpen = false;
             }
+    }
+
+    @Override
+    public void finish() {
+        /* The ROM destroys this Activity around the SAF picker.  SDLActivity's
+         * SDLMain.run() calls finish() when the native loop exits, which marks
+         * the task as finished and prevents Android from recreating it; the
+         * user then lands on the launcher after picking a folder.  Keep the
+         * task alive while the picker is pending so recreation can happen. */
+        if (sPickerPending && !isFinishing()) {
+            Log.i(TAG, "finish() suppressed while SAF picker is pending");
+            return;
+        }
+        super.finish();
     }
 
     @Override
