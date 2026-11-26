@@ -109,19 +109,8 @@ public class AngelSoundActivity extends SDLActivity {
                 Log.w(TAG, "folder launcher failed", e);
                 mPickerOpen = false;
                 sPickerPending = false;
-                    }
-        });
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        /* Safety net: if a result/cancel callback was lost while the ROM
-         * recreated this Activity, make sure the engine leaves the picker
-         * parking state as soon as the app is visible again. */
-        if (mPickerOpen) {
-            mPickerOpen = false;
             }
+        });
     }
 
     @Override
