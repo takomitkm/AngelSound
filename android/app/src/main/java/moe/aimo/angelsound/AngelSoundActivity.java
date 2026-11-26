@@ -87,6 +87,11 @@ public class AngelSoundActivity extends SDLActivity {
          * the payload: this is the only reliable signal on those devices. */
         if (data != null && data.getData() != null) {
             onFolderChosen(data.getData());
+        } else if (!dispatched) {
+            /* Cancel (or a registry callback that did not survive Activity
+             * recreation): still clear the native picker gate, otherwise the
+             * engine stays parked and stops reading input. */
+            onFolderChosen(null);
         }
         if (!dispatched) {
             super.onActivityResult(requestCode, resultCode, data);
@@ -101,8 +106,21 @@ public class AngelSoundActivity extends SDLActivity {
             } catch (Exception e) {
                 Log.w(TAG, "folder launcher failed", e);
                 mPickerOpen = false;
+                nativeFolderPickerClosed();
             }
         });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        /* Safety net: if a result/cancel callback was lost while the ROM
+         * recreated this Activity, make sure the engine leaves the picker
+         * parking state as soon as the app is visible again. */
+        if (mPickerOpen) {
+            mPickerOpen = false;
+            nativeFolderPickerClosed();
+        }
     }
 
     @Override
