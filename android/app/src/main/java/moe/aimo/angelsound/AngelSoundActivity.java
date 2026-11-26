@@ -125,6 +125,16 @@ public class AngelSoundActivity extends SDLActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        /* The picker is never visible while this Activity is resumed.  Clear
+         * the pending flag here as a safety net in case a ROM loses the SAF
+         * result callback; otherwise finish() would stay suppressed forever. */
+        sPickerPending = false;
+        mPickerOpen = false;
+    }
+
+    @Override
     public void finish() {
         /* The ROM destroys this Activity around the SAF picker.  SDLActivity's
          * SDLMain.run() calls finish() when the native loop exits, which marks
