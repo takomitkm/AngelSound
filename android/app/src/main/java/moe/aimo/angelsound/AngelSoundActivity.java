@@ -64,7 +64,6 @@ public class AngelSoundActivity extends SDLActivity {
 
     private void onFolderChosen(Uri uri) {
         mPickerOpen = false;
-        nativeFolderPickerClosed();
         if (uri == null) {
             return;
         }
@@ -106,8 +105,7 @@ public class AngelSoundActivity extends SDLActivity {
             } catch (Exception e) {
                 Log.w(TAG, "folder launcher failed", e);
                 mPickerOpen = false;
-                nativeFolderPickerClosed();
-            }
+                    }
         });
     }
 
@@ -119,8 +117,7 @@ public class AngelSoundActivity extends SDLActivity {
          * parking state as soon as the app is visible again. */
         if (mPickerOpen) {
             mPickerOpen = false;
-            nativeFolderPickerClosed();
-        }
+            }
     }
 
     @Override
@@ -140,7 +137,6 @@ public class AngelSoundActivity extends SDLActivity {
     }
 
     private static native void nativeSetFolder(String uri);
-    private static native void nativeFolderPickerClosed();
     private static native void nativeStop();
 
     private static Uri tree(String value) {

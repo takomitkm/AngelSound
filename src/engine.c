@@ -381,7 +381,6 @@ static bool g_running;
 static bool g_stop_requested;
 static bool g_paused;
 static bool g_pause_handled;
-static bool g_picker_open;
 static int g_smoke_frames;
 
 void engine_set_smoke(bool enabled)
@@ -441,7 +440,6 @@ int engine_create(int width, int height)
     memset(&g_app, 0, sizeof(g_app));
     g_smoke_frames = 0;
     g_paused = false;
-    g_picker_open = false;
     g_running = false;
     g_stop_requested = false;
 
@@ -599,14 +597,10 @@ void engine_set_folder(const char *uri_or_path)
 void engine_request_folder_picker(void)
 {
 #if defined(__ANDROID__)
-    /* Set the QUIT gate synchronously BEFORE the Java picker can destroy the
-     * activity.  The old polling code did the same with g_folder_pending;
-     * doing it in Java's runOnUiThread callback was a race: the SDL thread
-     * returns from this call immediately and sees QUIT before the callback
-     * ever runs. */
-    push_lock();
-    g_picker_open = true;
-    push_unlock();
+    /* Java owns the picker.  This ROM destroys and recreates the Activity
+     * around it; the engine stops cleanly on QUIT/destroy, the recreated
+     * Activity starts a fresh SDL thread and engine, and settings.txt
+     * restores the last folder. */
     android_storage_show_picker();
 #else
     storage_choose_folder();
@@ -623,23 +617,8 @@ void engine_start(void)
         push_lock();
         bool stop_requested = g_stop_requested;
         bool paused_now = g_paused;
-        bool picker_open = g_picker_open;
         push_unlock();
-        if (picker_open) {
-            /* SAF picker 让这台 ROM 销毁并重建 Activity。旧 Activity 的
-             * onDestroy() 会走 SDLActivity.nativeQuit()，销毁 SDL 的全局
-             * mutex/信号量/AssetManager。此时本线程若继续 PollEvent 或
-             * ui_render，会碰到已销毁的 SDL 状态并在 SDL_RenderDebugText
-             * 里触发堆损坏 (SIGSEGV in jemalloc)。保持线程存活、不调用
-             * 任何 SDL API，只等 Java 回调清除门控；SDL_Delay 在 Android
-             * 上只是 nanosleep，不依赖 SDL 的全局状态。 */
-            SDL_Delay(50);
-            continue;
-        }
-        /* The SAF picker destroys the Activity on some ROMs, which calls
-         * onDestroy() and asks the engine to stop.  Keep running until the
-         * picker result (or a cancel) arrives and clears the gate. */
-        if (stop_requested && !picker_open) {
+        if (stop_requested) {
             g_running = false;
             break;
         }
@@ -655,17 +634,6 @@ void engine_start(void)
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_EVENT_QUIT) {
-                /* The SAF picker destroys the Activity on some ROMs, which
-                 * SDL reports as QUIT.  The Activity is still alive as a Java
-                 * object and will deliver the result (or a cancel), so keep
-                 * the engine running until that signal arrives. */
-                bool picker_open = false;
-                push_lock();
-                picker_open = g_picker_open;
-                push_unlock();
-                if (picker_open || g_paused) {
-                    continue;
-                }
                 g_running = false;
                 continue;
             }
@@ -776,17 +744,6 @@ Java_moe_aimo_angelsound_AngelSoundActivity_nativeSetFolder(JNIEnv *env, jclass 
         engine_set_folder(chars);
         (*env)->ReleaseStringUTFChars(env, folder, chars);
     }
-}
-
-JNIEXPORT void JNICALL
-Java_moe_aimo_angelsound_AngelSoundActivity_nativeFolderPickerClosed(JNIEnv *env,
-                                                                    jclass clazz)
-{
-    (void)env;
-    (void)clazz;
-    push_lock();
-    g_picker_open = false;
-    push_unlock();
 }
 
 JNIEXPORT void JNICALL
